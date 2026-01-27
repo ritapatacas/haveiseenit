@@ -166,6 +166,23 @@ function initClips() {
   updateClips();
 }
 
+function setupRandomFilmHotkey() {
+  function onKeyDown(event) {
+    if (event.key !== "r" && event.key !== "R") return;
+    const target = event.target;
+    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+      return;
+    }
+
+    const posts = Array.from(document.querySelectorAll(".post"));
+    if (!posts.length) return;
+    const choice = posts[Math.floor(Math.random() * posts.length)];
+    choice.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  window.addEventListener("keydown", onKeyDown);
+}
+
 async function init() {
   const csvText = await fetch(CSV_URL).then((res) => res.text());
   const entries = parseCsv(csvText)
@@ -194,6 +211,7 @@ async function init() {
   }
 
   initClips();
+  setupRandomFilmHotkey();
 }
 
 init();

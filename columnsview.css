@@ -1,0 +1,58 @@
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: #000;
+  color: #fff;
+  font: 300 14px/1.45 "Red Hat Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  overflow: hidden;
+}
+
+.columns {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
+  gap: 0;
+}
+
+.column {
+  position: relative;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+
+.column::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.column__track {
+  display: flex;
+  flex-direction: column;
+}
+
+.column__item {
+  display: block;
+  width: 100%;
+}
+
+.column__item img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.loading {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(255,255,255,.7);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 12px;
+  pointer-events: none;
+}

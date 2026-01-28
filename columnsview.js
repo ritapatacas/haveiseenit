@@ -7,17 +7,79 @@ const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=
 const columnsRoot = document.getElementById("columns");
 
 function addHelpButton() {
-  const button = document.createElement("button");
+  const button = document.createElement("div");
   button.className = "help-button";
-  button.type = "button";
+  button.setAttribute("role", "button");
   button.setAttribute("aria-label", "Help");
+
+  const iconWrap = document.createElement("span");
+  iconWrap.className = "help-button__icon";
 
   const icon = document.createElement("i");
   icon.className = "fa-regular fa-circle-question fa-fade";
-  button.appendChild(icon);
+  iconWrap.appendChild(icon);
+
+  const panel = document.createElement("span");
+  panel.className = "help-button__panel";
+  panel.innerHTML =
+    "<span><strong>have i seen it?</strong></span>" +
+    "<input class=\"help-search\" type=\"search\" placeholder=\"search…\" />" +
+    "<p><span><strong>keys:</strong></span>" +
+    "<span>toggle</span>" +
+    "<span>random</span><p/>";
+
+  const close = document.createElement("button");
+  close.className = "help-button__close";
+  close.type = "button";
+  close.setAttribute("aria-label", "Close help");
+  close.textContent = "×";
+
+  button.append(iconWrap, panel, close);
+
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const target = event.target;
+    if (target instanceof HTMLElement) {
+      if (target.closest(".help-button__close") || target.closest(".help-button__icon")) {
+        button.classList.toggle("help-button--open");
+      }
+    }
+  });
+
+  document.addEventListener("click", () => {
+    button.classList.remove("help-button--open");
+  });
+
+  const input = button.querySelector(".help-search");
+  const panelEl = button.querySelector(".help-button__panel");
+  if (input) {
+    input.addEventListener("click", (event) => event.stopPropagation());
+  }
+  if (panelEl) {
+    panelEl.addEventListener("click", (event) => event.stopPropagation());
+  }
 
   document.body.appendChild(button);
-  return button;
+  return { button, input };
+}
+
+function setupHelpSearchFocus(help) {
+  if (!help || !help.input || !help.button) return;
+  window.addEventListener("keydown", (event) => {
+    if (event.key.length !== 1) return;
+    const target = event.target;
+    if (
+      target &&
+      (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+    ) {
+      return;
+    }
+    if (!help.button.classList.contains("help-button--open")) return;
+    help.input.focus();
+    help.input.value += event.key;
+    help.input.dispatchEvent(new Event("input", { bubbles: true }));
+    event.preventDefault();
+  });
 }
 
 function parseCsvLine(line) {
@@ -91,6 +153,7 @@ function getColumnCount() {
 function createItem(entry) {
   const link = document.createElement("a");
   link.className = "column__item";
+  link.dataset.key = `${entry.name}||${entry.year}`.toLowerCase();
   link.href = entry.uri || "#";
   link.target = "_blank";
   link.rel = "noopener noreferrer";
@@ -117,7 +180,7 @@ function buildTrack(entries) {
   return track;
 }
 
-function setupInfiniteScroll(column) {
+function setupInfiniteScroll(column, onReady) {
   const track = column.querySelector(".column__track");
   if (!track) return;
 
@@ -126,6 +189,7 @@ function setupInfiniteScroll(column) {
     if (!Number.isFinite(segmentHeight) || segmentHeight <= 0) return;
     column.dataset.segmentHeight = String(segmentHeight);
     column.scrollTop = segmentHeight;
+    if (typeof onReady === "function") onReady();
   }
 
   const images = Array.from(track.querySelectorAll("img"));
@@ -198,17 +262,20 @@ function setupLinkedScroll(columns) {
   });
 }
 
-function renderColumns(entries) {
+function renderColumns(entries, offset = 0, focusKey = "") {
   const withImages = entries.filter((entry) => entry.poster || entry.image);
   const count = getColumnCount();
+  columnOffset = offset;
 
   columnsRoot.style.setProperty("--cols", String(count));
   columnsRoot.innerHTML = "";
 
   const columns = Array.from({ length: count }, () => []);
   withImages.forEach((entry, index) => {
-    columns[index % count].push(entry);
+    const colIndex = (index + offset) % count;
+    columns[colIndex].push(entry);
   });
+  columnData = columns;
 
   columnEls = [];
   columns.forEach((items, index) => {
@@ -221,15 +288,79 @@ function renderColumns(entries) {
     columnsRoot.appendChild(column);
     columnEls.push(column);
 
-    setupInfiniteScroll(column);
+    const isCenter = focusKey && index === Math.floor(count / 2);
+    setupInfiniteScroll(column, isCenter ? () => focusInCenter(focusKey) : null);
     setupWheelScroll(column);
   });
 
   setupLinkedScroll(columnEls);
 }
 
+function focusInCenter(focusKey) {
+  if (!focusKey || !columnEls.length) return;
+  const centerIndex = Math.floor(columnEls.length / 2);
+  const column = columnEls[centerIndex];
+  if (!column) return;
+
+  const items = Array.from(column.querySelectorAll(".column__item"));
+  if (!items.length) return;
+
+  const matches = items.filter(
+    (item) => (item.dataset.key || "").toLowerCase() === focusKey
+  );
+  if (!matches.length) return;
+
+  const segmentHeight = Number(column.dataset.segmentHeight || 0);
+  let target = matches[Math.floor(matches.length / 2)];
+  if (segmentHeight) {
+    let best = null;
+    let bestDiff = Infinity;
+    for (const item of matches) {
+      const diff = Math.abs(item.offsetTop - segmentHeight);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        best = item;
+      }
+    }
+    if (best) target = best;
+  }
+  target.scrollIntoView({ block: "center", behavior: "smooth" });
+  column.scrollTop += Math.round(column.clientHeight * 3.04);
+}
+
+function setupSearch(input) {
+  if (!input) return;
+  input.addEventListener("input", () => {
+    const query = input.value.trim().toLowerCase();
+    if (!query) {
+      renderColumns(cachedEntries, 0, "");
+      return;
+    }
+
+    const match = cachedEntries.find(
+      (entry) =>
+        entry.name &&
+        entry.name.toLowerCase().includes(query) &&
+        (entry.poster || entry.image)
+    );
+    if (!match) return;
+
+    const withImages = cachedEntries.filter((entry) => entry.poster || entry.image);
+    const matchIndex = withImages.findIndex(
+      (entry) => entry.name === match.name && entry.year === match.year
+    );
+    const count = getColumnCount();
+    const centerIndex = Math.floor(count / 2);
+    const offset = (centerIndex - (matchIndex % count) + count) % count;
+    const focusKey = `${match.name}||${match.year}`.toLowerCase();
+    renderColumns(cachedEntries, offset, focusKey);
+  });
+}
+
 let cachedEntries = [];
 let columnEls = [];
+let columnData = [];
+let columnOffset = 0;
 
 function triggerSlotSpin() {
   if (!columnEls.length) return;
@@ -259,14 +390,32 @@ function triggerSlotSpin() {
   requestAnimationFrame(step);
 }
 
+function setupViewToggleHotkey() {
+  window.addEventListener("keydown", (event) => {
+    if (event.key !== "v" && event.key !== "V") return;
+    const target = event.target;
+    if (
+      target &&
+      (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+    ) {
+      return;
+    }
+    const next = "full";
+    window.location.search = `?v=${next}`;
+  });
+}
+
 async function init() {
-  addHelpButton();
+  const help = addHelpButton();
+  setupViewToggleHotkey();
   const csvText = await fetch(CSV_URL).then((res) => res.text());
   cachedEntries = parseCsv(csvText)
     .filter((row) => row.name && row.year)
     .sort((a, b) => b.date.localeCompare(a.date));
 
   renderColumns(cachedEntries);
+  setupSearch(help.input);
+  setupHelpSearchFocus(help);
 }
 
 let resizeTimer = null;

@@ -3,7 +3,6 @@
 }
 
 .help-button {
-  position: fixed;
   top: 16px;
   right: 16px;
   z-index: 3;
@@ -14,10 +13,14 @@
   border: 1px solid rgba(255,255,255,.18);
   background: rgba(0,0,0,.4);
   color: rgba(255,255,255,.8);
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   backdrop-filter: blur(6px);
+  overflow: hidden;
+  position: fixed;
+  transition: width 180ms ease, border-radius 180ms ease, background 180ms ease;
 }
 
 .help-button i {
@@ -31,4 +34,100 @@
 
 .help-button.is-static i {
   animation-name: none;
+}
+
+.help-button__icon {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+}
+
+.help-button__panel {
+  opacity: 0;
+  padding-top: 10px;
+
+  max-width: 0;
+  white-space: normal;
+  font-size: 12px;
+  line-height: 1.5;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  transition: opacity 150ms ease, max-width 180ms ease;
+}
+
+.help-button--open {
+  width: min(240px, calc(100vw - 32px));
+  height: auto;
+  min-height: 96px;
+  border-radius: 12px;
+  background: rgba(0,0,0,.55);
+  padding-right: 12px;
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: start;
+  justify-content: start;
+  gap: 0px;
+}
+
+.help-button--open .help-button__panel {
+  align-self: center;
+}
+
+.help-button--open .help-button__icon {
+  align-self: start;
+}
+
+.help-button--open .help-button__panel {
+  opacity: 1;
+  max-width: 320px;
+  padding-left: 10px;
+  padding-right: 20px;
+}
+
+.help-button__panel span {
+  display: block;
+}
+
+.help-button__panel strong {
+  font-weight: 900;
+}
+
+.help-search {
+  margin-top: 8px;
+  width: 100%;
+  max-width: 180px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.2);
+  background: rgba(0,0,0,.25);
+  color: rgba(255,255,255,.9);
+  font: 300 12px/1.2 "Red Hat Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  outline: none;
+}
+
+.help-search::placeholder {
+  color: rgba(255,255,255,.45);
+}
+
+.help-button__close {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  font-size: 16px;
+  opacity: 0;
+  transition: opacity 150ms ease;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.help-button--open .help-button__close {
+  opacity: 0.8;
+
 }

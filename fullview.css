@@ -3,11 +3,10 @@ html, body { height: 100%; }
 body {
   margin: 0;
   background: #000;
-  color: rgba(255,255,255,.8);
+  color: #fff;
   font: 300 14px/1.45 "Red Hat Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   overflow-x: hidden;
 }
-
 
 .feed { scroll-snap-type: y mandatory; }
 

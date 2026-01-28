@@ -6,82 +6,6 @@ const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=
 
 const columnsRoot = document.getElementById("columns");
 
-function addHelpButton() {
-  const button = document.createElement("div");
-  button.className = "help-button";
-  button.setAttribute("role", "button");
-  button.setAttribute("aria-label", "Help");
-
-  const iconWrap = document.createElement("span");
-  iconWrap.className = "help-button__icon";
-
-  const icon = document.createElement("i");
-  icon.className = "fa-regular fa-circle-question fa-fade";
-  iconWrap.appendChild(icon);
-
-  const panel = document.createElement("span");
-  panel.className = "help-button__panel";
-  panel.innerHTML =
-    "<span><strong>have i seen it?</strong></span>" +
-    "<input class=\"help-search\" type=\"search\" placeholder=\"search…\" />" +
-    "<p><span><strong>keys:</strong></span>" +
-    "<span>toggle</span>" +
-    "<span>random</span><p/>";
-
-  const close = document.createElement("button");
-  close.className = "help-button__close";
-  close.type = "button";
-  close.setAttribute("aria-label", "Close help");
-  close.textContent = "×";
-
-  button.append(iconWrap, panel, close);
-
-  button.addEventListener("click", (event) => {
-    event.stopPropagation();
-    const target = event.target;
-    if (target instanceof HTMLElement) {
-      if (target.closest(".help-button__close") || target.closest(".help-button__icon")) {
-        button.classList.toggle("help-button--open");
-      }
-    }
-  });
-
-  document.addEventListener("click", () => {
-    button.classList.remove("help-button--open");
-  });
-
-  const input = button.querySelector(".help-search");
-  const panelEl = button.querySelector(".help-button__panel");
-  if (input) {
-    input.addEventListener("click", (event) => event.stopPropagation());
-  }
-  if (panelEl) {
-    panelEl.addEventListener("click", (event) => event.stopPropagation());
-  }
-
-  document.body.appendChild(button);
-  return { button, input };
-}
-
-function setupHelpSearchFocus(help) {
-  if (!help || !help.input || !help.button) return;
-  window.addEventListener("keydown", (event) => {
-    if (event.key.length !== 1) return;
-    const target = event.target;
-    if (
-      target &&
-      (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
-    ) {
-      return;
-    }
-    if (!help.button.classList.contains("help-button--open")) return;
-    help.input.focus();
-    help.input.value += event.key;
-    help.input.dispatchEvent(new Event("input", { bubbles: true }));
-    event.preventDefault();
-  });
-}
-
 function parseCsvLine(line) {
   const out = [];
   let current = "";
@@ -328,35 +252,6 @@ function focusInCenter(focusKey) {
   column.scrollTop += Math.round(column.clientHeight * 3.04);
 }
 
-function setupSearch(input) {
-  if (!input) return;
-  input.addEventListener("input", () => {
-    const query = input.value.trim().toLowerCase();
-    if (!query) {
-      renderColumns(cachedEntries, 0, "");
-      return;
-    }
-
-    const match = cachedEntries.find(
-      (entry) =>
-        entry.name &&
-        entry.name.toLowerCase().includes(query) &&
-        (entry.poster || entry.image)
-    );
-    if (!match) return;
-
-    const withImages = cachedEntries.filter((entry) => entry.poster || entry.image);
-    const matchIndex = withImages.findIndex(
-      (entry) => entry.name === match.name && entry.year === match.year
-    );
-    const count = getColumnCount();
-    const centerIndex = Math.floor(count / 2);
-    const offset = (centerIndex - (matchIndex % count) + count) % count;
-    const focusKey = `${match.name}||${match.year}`.toLowerCase();
-    renderColumns(cachedEntries, offset, focusKey);
-  });
-}
-
 let cachedEntries = [];
 let columnEls = [];
 let columnData = [];
@@ -406,7 +301,6 @@ function setupViewToggleHotkey() {
 }
 
 async function init() {
-  const help = addHelpButton();
   setupViewToggleHotkey();
   const csvText = await fetch(CSV_URL).then((res) => res.text());
   cachedEntries = parseCsv(csvText)
@@ -414,8 +308,6 @@ async function init() {
     .sort((a, b) => b.date.localeCompare(a.date));
 
   renderColumns(cachedEntries);
-  setupSearch(help.input);
-  setupHelpSearchFocus(help);
 }
 
 let resizeTimer = null;

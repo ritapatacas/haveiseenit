@@ -37,14 +37,53 @@ function parseCsvLine(line) {
 }
 
 function parseCsv(text) {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length <= 1) return [];
-
   const rows = [];
-  for (let i = 1; i < lines.length; i += 1) {
-    const cols = parseCsvLine(lines[i]);
-    if (cols.length < 4) continue;
-    rows.push({
+  let row = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+
+    if (ch === '"') {
+      if (inQuotes && text[i + 1] === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (ch === "," && !inQuotes) {
+      row.push(current);
+      current = "";
+      continue;
+    }
+
+    if ((ch === "\n" || ch === "\r") && !inQuotes) {
+      if (ch === "\r" && text[i + 1] === "\n") i += 1;
+      row.push(current);
+      rows.push(row);
+      row = [];
+      current = "";
+      continue;
+    }
+
+    current += ch;
+  }
+
+  if (current.length || row.length) {
+    row.push(current);
+    rows.push(row);
+  }
+
+  if (rows.length <= 1) return [];
+  rows.shift();
+
+  return rows
+    .filter((cols) => cols.length >= 4)
+    .map((cols) => ({
       date: cols[0],
       name: cols[1],
       year: cols[2],
@@ -52,10 +91,7 @@ function parseCsv(text) {
       rating: cols[4] || "",
       review: cols[5] || "",
       image: cols[6] || "",
-    });
-  }
-
-  return rows;
+    }));
 }
 
 function ratingToStars(rating) {

@@ -170,6 +170,34 @@ function setupWheelScroll(column) {
   );
 }
 
+function setupLinkedScroll(columns) {
+  const lastScrollTop = new WeakMap();
+  let syncing = false;
+
+  columns.forEach((column) => {
+    lastScrollTop.set(column, column.scrollTop);
+
+    column.addEventListener("scroll", () => {
+      const current = column.scrollTop;
+      const last = lastScrollTop.get(column) ?? current;
+      const delta = current - last;
+      lastScrollTop.set(column, current);
+
+      if (syncing || delta === 0) return;
+
+      syncing = true;
+      columns.forEach((other) => {
+        if (other === column) return;
+        const distance = Math.abs(other.dataset.index - column.dataset.index);
+        const factor = 0.6 / Math.max(1, distance);
+        other.scrollTop += delta * factor;
+        lastScrollTop.set(other, other.scrollTop);
+      });
+      syncing = false;
+    });
+  });
+}
+
 function renderColumns(entries) {
   const withImages = entries.filter((entry) => entry.poster || entry.image);
   const count = getColumnCount();
@@ -182,20 +210,54 @@ function renderColumns(entries) {
     columns[index % count].push(entry);
   });
 
-  columns.forEach((items) => {
+  columnEls = [];
+  columns.forEach((items, index) => {
     const column = document.createElement("div");
     column.className = "column";
+    column.dataset.index = String(index);
 
     const track = buildTrack(items);
     column.appendChild(track);
     columnsRoot.appendChild(column);
+    columnEls.push(column);
 
     setupInfiniteScroll(column);
     setupWheelScroll(column);
   });
+
+  setupLinkedScroll(columnEls);
 }
 
 let cachedEntries = [];
+let columnEls = [];
+
+function triggerSlotSpin() {
+  if (!columnEls.length) return;
+
+  const states = columnEls.map((col, index) => {
+    const segmentHeight = Number(col.dataset.segmentHeight || 0);
+    const duration = 2000 + Math.random() * 3000;
+    const baseSpeed = 6 + Math.random() * 6;
+    const speed = baseSpeed * (1 + (columnEls.length - 1 - index) * 0.05);
+    return { col, duration, speed, start: performance.now(), segmentHeight };
+  });
+
+  function step(now) {
+    let active = false;
+    states.forEach((state) => {
+      const elapsed = now - state.start;
+      if (elapsed >= state.duration) return;
+      active = true;
+      const t = elapsed / state.duration;
+      const ease = (1 - t) * (1 - t);
+      const delta = state.speed * ease * 16;
+      state.col.scrollTop += delta;
+    });
+    if (active) requestAnimationFrame(step);
+  }
+
+  requestAnimationFrame(step);
+}
 
 async function init() {
   addHelpButton();
@@ -217,3 +279,16 @@ window.addEventListener("resize", () => {
 });
 
 init();
+
+window.addEventListener("keydown", (event) => {
+  if (event.code !== "Space") return;
+  const target = event.target;
+  if (
+    target &&
+    (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
+  ) {
+    return;
+  }
+  event.preventDefault();
+  triggerSlotSpin();
+});

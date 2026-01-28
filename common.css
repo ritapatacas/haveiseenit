@@ -1,0 +1,34 @@
+ :root {
+  --help-fade-duration: 7s;
+}
+
+.help-button {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 3;
+  padding: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(0,0,0,.4);
+  color: rgba(255,255,255,.8);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+
+.help-button i {
+  font-size: 18px;
+  line-height: 1;
+  display: block;
+  animation-duration: var(--help-fade-duration, 2.5s);
+  animation-iteration-count: var(--help-fade-iterations, infinite);
+  animation-timing-function: var(--help-fade-ease, ease-in-out);
+}
+
+.help-button.is-static i {
+  animation-name: none;
+}

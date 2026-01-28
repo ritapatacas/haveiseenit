@@ -6,6 +6,20 @@ const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=
 
 const columnsRoot = document.getElementById("columns");
 
+function addHelpButton() {
+  const button = document.createElement("button");
+  button.className = "help-button";
+  button.type = "button";
+  button.setAttribute("aria-label", "Help");
+
+  const icon = document.createElement("i");
+  icon.className = "fa-regular fa-circle-question fa-fade";
+  button.appendChild(icon);
+
+  document.body.appendChild(button);
+  return button;
+}
+
 function parseCsvLine(line) {
   const out = [];
   let current = "";
@@ -184,6 +198,7 @@ function renderColumns(entries) {
 let cachedEntries = [];
 
 async function init() {
+  addHelpButton();
   const csvText = await fetch(CSV_URL).then((res) => res.text());
   cachedEntries = parseCsv(csvText)
     .filter((row) => row.name && row.year)

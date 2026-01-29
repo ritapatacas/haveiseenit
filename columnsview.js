@@ -74,6 +74,14 @@ function getColumnCount() {
   return 12;
 }
 
+function getEntryImage(entry) {
+  if (!entry) return "";
+  const poster = typeof entry.poster === "string" ? entry.poster.trim() : "";
+  if (poster) return poster;
+  const image = typeof entry.image === "string" ? entry.image.trim() : "";
+  return image;
+}
+
 function createItem(entry) {
   const link = document.createElement("a");
   link.className = "column__item";
@@ -85,7 +93,7 @@ function createItem(entry) {
   const img = document.createElement("img");
   img.loading = "lazy";
   img.decoding = "async";
-  img.src = entry.poster || entry.image;
+  img.src = getEntryImage(entry);
   img.alt = `${entry.name} (${entry.year})`;
   link.appendChild(img);
   return link;
@@ -187,7 +195,7 @@ function setupLinkedScroll(columns) {
 }
 
 function renderColumns(entries, offset = 0, focusKey = "") {
-  const withImages = entries.filter((entry) => entry.poster || entry.image);
+  const withImages = entries.filter((entry) => getEntryImage(entry));
   const count = getColumnCount();
   columnOffset = offset;
 
@@ -248,14 +256,61 @@ function focusInCenter(focusKey) {
     }
     if (best) target = best;
   }
-  target.scrollIntoView({ block: "center", behavior: "smooth" });
-  column.scrollTop += Math.round(column.clientHeight * 3.04);
+  let targetTop = target.offsetTop - (column.clientHeight - target.clientHeight) / 2;
+  if (segmentHeight) {
+    const min = segmentHeight * 0.5;
+    const max = segmentHeight * 1.5;
+    while (targetTop < min) targetTop += segmentHeight;
+    while (targetTop > max) targetTop -= segmentHeight;
+  }
+  column.scrollTo({ top: Math.max(0, targetTop), behavior: "smooth" });
+}
+
+function setupSearch(input) {
+  if (!input) return;
+  input.addEventListener("input", () => {
+    const query = input.value.trim().toLowerCase();
+    if (!query) {
+      renderColumns(cachedEntries, 0, "");
+      return;
+    }
+
+    const match = cachedEntries.find(
+      (entry) =>
+        entry.name &&
+        entry.name.toLowerCase().includes(query) &&
+        getEntryImage(entry)
+    );
+    if (!match) return;
+
+    const withImages = cachedEntries.filter((entry) => getEntryImage(entry));
+    const matchIndex = withImages.findIndex(
+      (entry) => entry.name === match.name && entry.year === match.year
+    );
+    const count = getColumnCount();
+    const centerIndex = Math.floor(count / 2);
+    const offset = (centerIndex - (matchIndex % count) + count) % count;
+    const focusKey = `${match.name}||${match.year}`.toLowerCase();
+    renderColumns(cachedEntries, offset, focusKey);
+  });
 }
 
 let cachedEntries = [];
 let columnEls = [];
 let columnData = [];
 let columnOffset = 0;
+
+function randomInCenterColumn() {
+  if (!columnEls.length) return;
+  const centerIndex = Math.floor(columnEls.length / 2);
+  const column = columnEls[centerIndex];
+  if (!column) return;
+  const items = Array.from(column.querySelectorAll(".column__item"));
+  if (!items.length) return;
+  const target = items[Math.floor(Math.random() * items.length)];
+  target.scrollIntoView({ block: "center", behavior: "smooth" });
+  column.scrollTop += Math.round(column.clientHeight * 0.28);
+}
 
 function triggerSlotSpin() {
   if (!columnEls.length) return;
@@ -285,29 +340,21 @@ function triggerSlotSpin() {
   requestAnimationFrame(step);
 }
 
-function setupViewToggleHotkey() {
-  window.addEventListener("keydown", (event) => {
-    if (event.key !== "v" && event.key !== "V") return;
-    const target = event.target;
-    if (
-      target &&
-      (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
-    ) {
-      return;
-    }
-    const next = "full";
-    window.location.search = `?v=${next}`;
-  });
-}
-
 async function init() {
-  setupViewToggleHotkey();
+  const help = window.HelpUI.createHelpUI();
+  window.HelpUI.setupCommonHotkeys(help, {
+    onToggleView: () => {
+      window.location.search = "?v=full";
+    },
+    onRandom: randomInCenterColumn,
+  });
   const csvText = await fetch(CSV_URL).then((res) => res.text());
   cachedEntries = parseCsv(csvText)
     .filter((row) => row.name && row.year)
     .sort((a, b) => b.date.localeCompare(a.date));
 
   renderColumns(cachedEntries);
+  setupSearch(help.input);
 }
 
 let resizeTimer = null;

@@ -6,10 +6,10 @@ const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=
 
 const feed = document.getElementById("feed");
 let cachedEntries = [];
-let hotkeyReady = false;
 let clipPosts = [];
 let clipsReady = false;
 let clipTicking = false;
+
 function parseCsvLine(line) {
   const out = [];
   let current = "";
@@ -207,21 +207,22 @@ function initClips() {
   updateClips();
 }
 
-function setupRandomFilmHotkey() {
-  function onKeyDown(event) {
-    if (event.key !== "r" && event.key !== "R") return;
-    const target = event.target;
-    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
-      return;
-    }
+function randomFilm() {
+  const posts = Array.from(document.querySelectorAll(".post"));
+  if (!posts.length) return;
+  const choice = posts[Math.floor(Math.random() * posts.length)];
+  choice.scrollIntoView({ behavior: "smooth", block: "start" });
+}
 
-    const posts = Array.from(document.querySelectorAll(".post"));
-    if (!posts.length) return;
-    const choice = posts[Math.floor(Math.random() * posts.length)];
-    choice.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  window.addEventListener("keydown", onKeyDown);
+function setupSearch(input) {
+  if (!input) return;
+  input.addEventListener("input", () => {
+    const query = input.value.trim().toLowerCase();
+    const filtered = query
+      ? cachedEntries.filter((entry) => entry.name.toLowerCase().includes(query))
+      : cachedEntries;
+    renderEntries(filtered);
+  });
 }
 
 function renderEntries(entries) {
@@ -250,16 +251,20 @@ function renderEntries(entries) {
 }
 
 async function init() {
+  const help = window.HelpUI.createHelpUI();
+  window.HelpUI.setupCommonHotkeys(help, {
+    onToggleView: () => {
+      window.location.search = "?v=col";
+    },
+    onRandom: randomFilm,
+  });
   const csvText = await fetch(CSV_URL).then((res) => res.text());
   cachedEntries = parseCsv(csvText)
     .filter((row) => row.name && row.year)
     .sort((a, b) => b.date.localeCompare(a.date));
 
   renderEntries(cachedEntries);
-  if (!hotkeyReady) {
-    setupRandomFilmHotkey();
-    hotkeyReady = true;
-  }
+  setupSearch(help.input);
 }
 
 init();

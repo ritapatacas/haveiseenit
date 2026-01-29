@@ -113,6 +113,32 @@
   color: rgba(255,255,255,.45);
 }
 
+.help-toggle {
+  margin-top: 10px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.08);
+  color: rgba(255,255,255,.8);
+  font: 300 11px/1 "Red Hat Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 4px;
+}
+
+.help-toggle__item {
+  padding: 4px 8px;
+  border-radius: 999px;
+  opacity: 0.6;
+}
+
+.help-toggle__item.is-active {
+  background: rgba(255,255,255,.18);
+  opacity: 1;
+}
+
 .help-button__close {
   position: absolute;
   top: 4px;

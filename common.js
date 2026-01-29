@@ -1,5 +1,5 @@
 (() => {
-  function buildHelpPanel() {
+  function buildHelpPanel(options) {
     const panel = document.createElement("span");
     panel.className = "help-button__panel";
     panel.innerHTML =
@@ -9,10 +9,21 @@
       "<span>keys:</span>" +
       "<span>toggle</span>" +
       "<span>random</span>";
+
+    if (options && typeof options.onToggleList === "function") {
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "help-toggle";
+      const current = options.currentList || "films";
+      toggle.innerHTML =
+        `<span class="help-toggle__item ${current === "films" ? "is-active" : ""}">films</span>` +
+        `<span class="help-toggle__item ${current === "watchlist" ? "is-active" : ""}">watchlist</span>`;
+      panel.appendChild(toggle);
+    }
     return panel;
   }
 
-  function createHelpUI() {
+  function createHelpUI(options) {
     const button = document.createElement("div");
     button.className = "help-button";
     button.setAttribute("role", "button");
@@ -25,7 +36,7 @@
     icon.className = "fa-regular fa-circle-question fa-fade";
     iconWrap.appendChild(icon);
 
-    const panel = buildHelpPanel();
+    const panel = buildHelpPanel(options);
 
     const close = document.createElement("button");
     close.className = "help-button__close";
@@ -53,13 +64,23 @@
     });
 
     const input = panel.querySelector(".help-search");
+    const toggle = panel.querySelector(".help-toggle");
     if (input) {
       input.addEventListener("click", (event) => event.stopPropagation());
     }
     panel.addEventListener("click", (event) => event.stopPropagation());
+    if (toggle && options && typeof options.onToggleList === "function") {
+      toggle.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const current =
+          toggle.querySelector(".help-toggle__item.is-active")?.textContent || "films";
+        const next = current === "films" ? "watchlist" : "films";
+        options.onToggleList(next);
+      });
+    }
 
     document.body.appendChild(button);
-    return { button, input, open, close: closeMenu };
+    return { button, input, open, close: closeMenu, toggle };
   }
 
   function setupCommonHotkeys(help, handlers) {
@@ -122,5 +143,14 @@
   window.HelpUI = {
     createHelpUI,
     setupCommonHotkeys,
+    setListToggle(toggle, current) {
+      if (!toggle) return;
+      const items = toggle.querySelectorAll(".help-toggle__item");
+      items.forEach((item) => {
+        const isFilms = item.textContent === "films";
+        const active = current === (isFilms ? "films" : "watchlist");
+        item.classList.toggle("is-active", active);
+      });
+    },
   };
 })();

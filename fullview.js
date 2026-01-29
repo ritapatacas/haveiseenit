@@ -1,14 +1,18 @@
 const SHEET_ID = "1sP2Tkz00oTiVoACyCznYBOqTaUecUVbUKSQUWVsQDe4";
-const SHEET_NAME = "films";
-const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
-  SHEET_NAME
-)}`;
+const DEFAULT_SHEET = "films";
+
+function getCsvUrl(sheetName) {
+  return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
+    sheetName
+  )}`;
+}
 
 const feed = document.getElementById("feed");
 let cachedEntries = [];
 let clipPosts = [];
 let clipsReady = false;
 let clipTicking = false;
+let currentSheet = DEFAULT_SHEET;
 
 function parseCsvLine(line) {
   const out = [];
@@ -91,10 +95,14 @@ function parseCsv(text) {
       date: cols[0],
       name: cols[1],
       year: cols[2],
-      uri: cols[3],
-      rating: cols[4] || "",
-      review: cols[5] || "",
-      image: cols[6] || "",
+      letterboxdUri: cols[3] || "",
+      filmUri: cols[4] || "",
+      image: cols[5] || "",
+      poster: cols[6] || "",
+      genre: cols[7] || "",
+      director: cols[8] || "",
+      rating: cols[9] || "",
+      review: cols[10] || "",
     }));
 }
 
@@ -231,10 +239,11 @@ function renderEntries(entries) {
   entries.forEach((entry) => {
     const backdropUrl = entry.image;
     if (!backdropUrl) return;
+    const uri = entry.filmUri || entry.letterboxdUri;
     const post = createPost({
       name: entry.name,
       year: entry.year,
-      uri: entry.uri,
+      uri,
       rating: entry.rating,
       review: entry.review,
       backdropUrl,
@@ -251,20 +260,43 @@ function renderEntries(entries) {
 }
 
 async function init() {
-  const help = window.HelpUI.createHelpUI();
+  const params = new URLSearchParams(window.location.search);
+  currentSheet = params.get("list") === "watchlist" ? "watchlist" : "films";
+
+  const help = window.HelpUI.createHelpUI({
+    currentList: currentSheet,
+    onToggleList: async (nextList) => {
+      currentSheet = nextList;
+      const nextParams = new URLSearchParams(window.location.search);
+      if (currentSheet === "watchlist") {
+        nextParams.set("list", "watchlist");
+      } else {
+        nextParams.delete("list");
+      }
+      window.history.replaceState({}, "", `?${nextParams.toString()}`);
+      window.HelpUI.setListToggle(help.toggle, currentSheet);
+      await loadEntries();
+    },
+  });
+  window.HelpUI.setListToggle(help.toggle, currentSheet);
   window.HelpUI.setupCommonHotkeys(help, {
     onToggleView: () => {
-      window.location.search = "?v=col";
+      const nextParams = new URLSearchParams(window.location.search);
+      nextParams.set("v", "col");
+      window.location.search = nextParams.toString();
     },
     onRandom: randomFilm,
   });
-  const csvText = await fetch(CSV_URL).then((res) => res.text());
-  cachedEntries = parseCsv(csvText)
-    .filter((row) => row.name && row.year)
-    .sort((a, b) => b.date.localeCompare(a.date));
+  async function loadEntries() {
+    const csvText = await fetch(getCsvUrl(currentSheet)).then((res) => res.text());
+    cachedEntries = parseCsv(csvText)
+      .filter((row) => row.name && row.year)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    renderEntries(cachedEntries);
+  }
 
-  renderEntries(cachedEntries);
   setupSearch(help.input);
+  await loadEntries();
 }
 
 init();

@@ -37,12 +37,23 @@ body {
 .column__item {
   display: block;
   width: 100%;
+  transition: opacity 200ms ease, filter 200ms ease;
 }
 
 .column__item img {
   display: block;
   width: 100%;
   height: auto;
+}
+
+.columns.is-dim .column__item {
+  opacity: 0.4;
+  filter: saturate(0.7) brightness(0.9);
+}
+
+.columns.is-dim .column__item.is-active {
+  opacity: 1;
+  filter: none;
 }
 
 .loading {

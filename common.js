@@ -4,11 +4,12 @@
     panel.className = "help-button__panel";
     panel.innerHTML =
       "<span><strong>have i seen it?</strong></span>" +
-      "<span>search</span>" +
-      "<input class=\"help-search\" type=\"search\" placeholder=\"search…\" />" +
-      "<span>keys:</span>" +
-      "<span>toggle</span>" +
-      "<span>random</span>";
+      "<input class=\"help-search\" type=\"search\" placeholder=\"search\" />" +
+      "<div class=\"help-section\"><span>shortcuts:</span>" +
+      "<span><button type=\"button\" class=\"help-action\" data-action=\"random\">random</button> - press space</span>" +
+      "<span><button type=\"button\" class=\"help-action\" data-action=\"toggle\">view</button> - press v</span>" +
+      "<span>help - press h</span>" +
+      "<span>search - press s</span></div>";
 
     if (options && typeof options.onToggleList === "function") {
       const toggle = document.createElement("button");
@@ -18,7 +19,12 @@
       toggle.innerHTML =
         `<span class="help-toggle__item ${current === "films" ? "is-active" : ""}">films</span>` +
         `<span class="help-toggle__item ${current === "watchlist" ? "is-active" : ""}">watchlist</span>`;
-      panel.appendChild(toggle);
+      const keys = panel.querySelector(".help-section");
+      if (keys) {
+        keys.before(toggle);
+      } else {
+        panel.appendChild(toggle);
+      }
     }
     return panel;
   }
@@ -47,14 +53,24 @@
     button.append(iconWrap, panel, close);
 
     const open = () => button.classList.add("help-button--open");
-    const closeMenu = () => button.classList.remove("help-button--open");
+    const closeMenu = () => {
+      if (!button.classList.contains("help-button--open")) return;
+      button.classList.remove("help-button--open");
+      if (options && typeof options.onClose === "function") {
+        options.onClose();
+      }
+    };
 
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       const target = event.target;
       if (target instanceof HTMLElement) {
         if (target.closest(".help-button__close") || target.closest(".help-button__icon")) {
-          button.classList.toggle("help-button--open");
+          if (button.classList.contains("help-button--open")) {
+            closeMenu();
+          } else {
+            open();
+          }
         }
       }
     });
@@ -65,6 +81,7 @@
 
     const input = panel.querySelector(".help-search");
     const toggle = panel.querySelector(".help-toggle");
+    const actions = panel.querySelectorAll(".help-action");
     if (input) {
       input.addEventListener("click", (event) => event.stopPropagation());
     }
@@ -78,13 +95,26 @@
         options.onToggleList(next);
       });
     }
+    actions.forEach((action) => {
+      action.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (!options) return;
+        const type = action.getAttribute("data-action");
+        if (type === "toggle" && typeof options.onToggleView === "function") {
+          options.onToggleView();
+        }
+        if (type === "random" && typeof options.onRandom === "function") {
+          options.onRandom();
+        }
+      });
+    });
 
     document.body.appendChild(button);
     return { button, input, open, close: closeMenu, toggle };
   }
 
   function setupCommonHotkeys(help, handlers) {
-    const { onToggleView, onRandom } = handlers || {};
+    const { onToggleView, onRandom, randomKey } = handlers || {};
     if (!help || !help.button) return;
 
     window.addEventListener("keydown", (event) => {
@@ -124,9 +154,17 @@
         return;
       }
 
-      if ((key === "r" || key === "R") && !typingTarget && typeof onRandom === "function") {
-        onRandom();
-        return;
+      if (!typingTarget && typeof onRandom === "function" && randomKey) {
+        const isSpace = randomKey === "Space" && event.code === "Space";
+        const isChar =
+          typeof randomKey === "string" &&
+          randomKey.length === 1 &&
+          (key === randomKey || key === randomKey.toUpperCase());
+        if (isSpace || isChar) {
+          onRandom();
+          event.preventDefault();
+          return;
+        }
       }
 
       if (!typingTarget && help.button.classList.contains("help-button--open") && help.input) {

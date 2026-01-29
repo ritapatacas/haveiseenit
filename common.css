@@ -47,6 +47,7 @@
 .help-button__panel {
   opacity: 0;
   padding-top: 10px;
+  padding-bottom: 15px;
 
   max-width: 0;
   white-space: normal;
@@ -90,6 +91,26 @@
   display: block;
 }
 
+.help-section {
+  margin-top: 12px;
+}
+
+.help-action {
+  border: 0;
+  background: transparent;
+  color: rgba(255,255,255,.9);
+  font: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+}
+
+.help-action:hover {
+  text-decoration: underline;
+}
+
 .help-button__panel strong {
   font-weight: 900;
 }
@@ -116,7 +137,7 @@
 .help-toggle {
   margin-top: 10px;
   padding: 4px;
-  border-radius: 999px;
+  border-radius: 8px;
   border: 1px solid rgba(255,255,255,.18);
   background: rgba(255,255,255,.08);
   color: rgba(255,255,255,.8);
@@ -130,7 +151,7 @@
 
 .help-toggle__item {
   padding: 4px 8px;
-  border-radius: 999px;
+  border-radius: 6px;
   opacity: 0.6;
 }
 

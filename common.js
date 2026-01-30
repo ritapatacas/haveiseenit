@@ -29,7 +29,43 @@
     return panel;
   }
 
+  function buildMobileSearchPanel(options) {
+    const panel = document.createElement("span");
+    panel.className = "help-button__panel";
+    panel.innerHTML =
+      "<span><strong>search</strong></span>" +
+      "<input class=\"help-search\" type=\"search\" placeholder=\"search\" />";
+    if (options && typeof options.onToggleList === "function") {
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "help-toggle";
+      const current = options.currentList || "films";
+      toggle.innerHTML =
+        `<span class="help-toggle__item ${current === "films" ? "is-active" : ""}">films</span>` +
+        `<span class="help-toggle__item ${current === "watchlist" ? "is-active" : ""}">watchlist</span>`;
+      panel.appendChild(toggle);
+    }
+    return panel;
+  }
+
+  function buildMobileShortcutsPanel() {
+    const panel = document.createElement("span");
+    panel.className = "help-button__panel";
+    panel.innerHTML =
+      "<span><strong>shortcuts</strong></span>" +
+      "<span>view - press v</span>" +
+      "<span>random - press space</span>" +
+      "<span>help - press h</span>" +
+      "<span>search - press s</span>";
+    return panel;
+  }
+
   function createHelpUI(options) {
+    const isMobile = window.matchMedia("(max-width: 768px)").matches;
+    if (isMobile) {
+      return createMobileHelpUI(options);
+    }
+
     const button = document.createElement("div");
     button.className = "help-button";
     button.setAttribute("role", "button");
@@ -85,7 +121,6 @@
     if (input) {
       input.addEventListener("click", (event) => event.stopPropagation());
     }
-    panel.addEventListener("click", (event) => event.stopPropagation());
     if (toggle && options && typeof options.onToggleList === "function") {
       toggle.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -110,7 +145,108 @@
     });
 
     document.body.appendChild(button);
-    return { button, input, open, close: closeMenu, toggle };
+    return { button, input, open, close: closeMenu, toggle, bar: null };
+  }
+
+  function createMobileHelpUI(options) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "mobile-help";
+
+    const trigger = document.createElement("button");
+    trigger.className = "mobile-help-trigger";
+    trigger.type = "button";
+    trigger.setAttribute("aria-label", "Menu");
+    trigger.textContent = "...";
+
+    const menu = document.createElement("div");
+    menu.className = "mobile-help-menu";
+
+    const randomBtn = document.createElement("button");
+    randomBtn.type = "button";
+    randomBtn.className = "mobile-help-menu__btn mobile-help-menu__btn--random";
+    randomBtn.setAttribute("aria-label", "Random");
+    randomBtn.innerHTML = '<i class="fa-solid fa-bolt-lightning"></i>';
+
+    const searchBtn = document.createElement("button");
+    searchBtn.type = "button";
+    searchBtn.className = "mobile-help-menu__btn mobile-help-menu__btn--search";
+    searchBtn.setAttribute("aria-label", "Search");
+    searchBtn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>';
+
+    const helpBtn = document.createElement("button");
+    helpBtn.type = "button";
+    helpBtn.className = "mobile-help-menu__btn mobile-help-menu__btn--help";
+    helpBtn.setAttribute("aria-label", "Help");
+    helpBtn.innerHTML = '<i class="fa-solid fa-circle-question"></i>';
+
+    menu.append(randomBtn, searchBtn, helpBtn);
+
+    const searchPanel = buildMobileSearchPanel(options);
+    searchPanel.classList.add("mobile-help-search");
+
+    wrapper.append(trigger, menu, searchPanel);
+
+    const open = () => wrapper.classList.add("is-open");
+    const closeMenu = () => wrapper.classList.remove("is-open");
+    const isOpen = () => wrapper.classList.contains("is-open");
+
+    trigger.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (isOpen()) {
+        closeMenu();
+      } else {
+        open();
+      }
+    });
+
+    randomBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (options && typeof options.onRandom === "function") options.onRandom();
+    });
+
+    searchBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      open();
+      searchPanel.classList.add("is-open");
+      const input = searchPanel.querySelector(".help-search");
+      if (input) input.focus();
+    });
+
+    helpBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      open();
+      searchPanel.classList.remove("is-open");
+    });
+
+    document.addEventListener("click", (event) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && wrapper.contains(target)) return;
+      closeMenu();
+      searchPanel.classList.remove("is-open");
+    });
+
+    const input = searchPanel.querySelector(".help-search");
+    const toggle = searchPanel.querySelector(".help-toggle");
+    if (input) {
+      input.addEventListener("click", (event) => event.stopPropagation());
+    }
+
+    if (toggle && options && typeof options.onToggleList === "function") {
+      toggle.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const current =
+          toggle.querySelector(".help-toggle__item.is-active")?.textContent || "films";
+        const next = current === "films" ? "watchlist" : "films";
+        options.onToggleList(next);
+      });
+    }
+
+    document.body.appendChild(wrapper);
+    return { button: wrapper, input, open, close: closeMenu, toggle, bar: null, isOpen };
+  }
+
+  function createMobileBar() {
+    return null;
   }
 
   function setupCommonHotkeys(help, handlers) {
@@ -124,20 +260,24 @@
         target &&
         (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
 
-      if ((key === "Escape" || key === "Esc") && help.button.classList.contains("help-button--open")) {
+    const openNow = help.isOpen
+      ? help.isOpen()
+      : help.button.classList.contains("help-button--open") ||
+        help.button.classList.contains("is-open");
+    if ((key === "Escape" || key === "Esc") && openNow) {
+      help.close();
+      if (help.input) help.input.blur();
+      return;
+    }
+
+    if ((key === "h" || key === "H") && !typingTarget) {
+      if (openNow) {
         help.close();
         if (help.input) help.input.blur();
-        return;
+      } else {
+        help.open();
+        if (help.input) help.input.focus();
       }
-
-      if ((key === "h" || key === "H") && !typingTarget) {
-        if (help.button.classList.contains("help-button--open")) {
-          help.close();
-          if (help.input) help.input.blur();
-        } else {
-          help.open();
-          if (help.input) help.input.focus();
-        }
         event.preventDefault();
         return;
       }
@@ -167,10 +307,10 @@
         }
       }
 
-      if (!typingTarget && help.button.classList.contains("help-button--open") && help.input) {
-        if (key.length === 1) {
-          help.input.focus();
-          help.input.value += key;
+    if (!typingTarget && openNow && help.input) {
+      if (key.length === 1) {
+        help.input.focus();
+        help.input.value += key;
           help.input.dispatchEvent(new Event("input", { bubbles: true }));
           event.preventDefault();
         }

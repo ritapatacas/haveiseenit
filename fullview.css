@@ -51,24 +51,28 @@ body {
   border-radius: 14px;
   padding: 14px 16px;
 }
-.card h2 { margin: 0 0 6px; font-size: 14px; line-height: 1.15; }
+.card h2 { margin: 0 0 6px; font-size: 14px; line-height: 1.15; font-weight: 300; }
 .card p { margin: 0; opacity: .92; font-size: 12px; font-style: italic; }
 .card a {
   color: inherit;
   text-decoration: none;
 }
+.card .rating,
 .card a span {
   display: inline-flex;
-  align-items: flex-start;
+  align-items: center;
   margin-top: 4px;
-  font-size: 22px;
+  font-size: 26px;
+  line-height: 1;
   letter-spacing: 0.04em;
 }
+.card .rating__half,
 .card a span.rating__half {
-  font-size: 14px;
+  font-size: 18px;
   line-height: 1;
-  padding-top: 3px;
   letter-spacing: 0;
+  padding-top: 2px;
+  transform: translateY(1px) scaleX(0.9);
 }
 
 .loading {
@@ -82,3 +86,4 @@ body {
   font-size: 12px;
   pointer-events: none;
 }
+.card h2 strong { font-weight: 700; }

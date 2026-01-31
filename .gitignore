@@ -2,3 +2,9 @@ letterboxd-ritsaptcs/*
 apps_script.gs
 
 app-script/*
+
+*/node_modules/*
+
+.env
+
+tmp

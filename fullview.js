@@ -14,6 +14,11 @@ let clipsReady = false;
 let clipTicking = false;
 let currentSheet = DEFAULT_SHEET;
 
+function getEntryLimit() {
+  const isSmall = window.matchMedia("(max-width: 768px)").matches;
+  return isSmall ? 40 : null;
+}
+
 function parseCsvLine(line) {
   const out = [];
   let current = "";
@@ -117,7 +122,7 @@ function ratingToStars(rating) {
   return stars;
 }
 
-function createPost({ name, year, uri, rating, review, backdropUrl }) {
+function createPost({ name, year, director, letterboxdUri, rating, review, backdropUrl }) {
   const section = document.createElement("section");
   section.className = "post";
   section.dataset.bg = backdropUrl;
@@ -133,11 +138,18 @@ function createPost({ name, year, uri, rating, review, backdropUrl }) {
 
   const title = document.createElement("h2");
   const link = document.createElement("a");
-  link.href = uri;
-  link.textContent = `${name} (${year})`;
+  link.href = letterboxdUri || "#";
+  const strong = document.createElement("strong");
+  strong.textContent = name;
+  link.append(strong);
   const stars = ratingToStars(rating);
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  title.append(link);
+  const metaText = director ? ` (${year}), ${director}` : ` (${year})`;
+  title.append(document.createTextNode(metaText));
   if (stars) {
-    link.append(document.createElement("br"));
+    title.append(document.createElement("br"));
     const ratingLine = document.createElement("span");
     ratingLine.className = "rating";
     if (stars.includes("½")) {
@@ -151,11 +163,8 @@ function createPost({ name, year, uri, rating, review, backdropUrl }) {
     } else {
       ratingLine.textContent = stars;
     }
-    link.append(ratingLine);
+    title.append(ratingLine);
   }
-  link.target = "_blank";
-  link.rel = "noopener noreferrer";
-  title.append(link);
   card.append(title);
   if (review) {
     const reviewText = document.createElement("p");
@@ -226,24 +235,48 @@ function setupSearch(input) {
   if (!input) return;
   input.addEventListener("input", () => {
     const query = input.value.trim().toLowerCase();
-    const filtered = query
-      ? cachedEntries.filter((entry) => entry.name.toLowerCase().includes(query))
-      : cachedEntries;
-    renderEntries(filtered);
+    if (!query) {
+      renderEntries(cachedEntries);
+      return;
+    }
+
+    function scoreText(text, q) {
+      if (!text) return 0;
+      const t = text.toLowerCase();
+      if (t === q) return 100;
+      if (t.startsWith(q)) return 80;
+      if (new RegExp(`\\b${q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(t)) return 70;
+      if (t.includes(q)) return 50;
+      return 0;
+    }
+
+    const scored = cachedEntries
+      .map((entry) => {
+        const nameScore = scoreText(entry.name, query);
+        const directorScore = scoreText(entry.director || "", query) * 0.8;
+        const score = Math.max(nameScore, directorScore);
+        return { entry, score };
+      })
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score || b.entry.date.localeCompare(a.entry.date))
+      .map((item) => item.entry);
+
+    renderEntries(scored);
   });
 }
 
 function renderEntries(entries) {
   feed.innerHTML = "";
+  const usePoster = window.matchMedia("(orientation: portrait)").matches;
 
   entries.forEach((entry) => {
-    const backdropUrl = entry.image;
+    const backdropUrl = usePoster ? entry.poster || entry.image : entry.image || entry.poster;
     if (!backdropUrl) return;
-    const uri = entry.filmUri || entry.letterboxdUri;
     const post = createPost({
       name: entry.name,
       year: entry.year,
-      uri,
+      director: entry.director,
+      letterboxdUri: entry.letterboxdUri,
       rating: entry.rating,
       review: entry.review,
       backdropUrl,
@@ -261,17 +294,23 @@ function renderEntries(entries) {
 
 async function init() {
   const params = new URLSearchParams(window.location.search);
-  currentSheet = params.get("list") === "watchlist" ? "watchlist" : "films";
+  currentSheet = params.get("l") === "w" ? "watchlist" : "films";
 
   const help = window.HelpUI.createHelpUI({
     currentList: currentSheet,
+    onToggleView: () => {
+      const nextParams = new URLSearchParams(window.location.search);
+      nextParams.set("v", "col");
+      window.location.search = nextParams.toString();
+    },
+    onRandom: randomFilm,
     onToggleList: async (nextList) => {
       currentSheet = nextList;
       const nextParams = new URLSearchParams(window.location.search);
       if (currentSheet === "watchlist") {
-        nextParams.set("list", "watchlist");
+        nextParams.set("l", "w");
       } else {
-        nextParams.delete("list");
+        nextParams.delete("l");
       }
       window.history.replaceState({}, "", `?${nextParams.toString()}`);
       window.HelpUI.setListToggle(help.toggle, currentSheet);
@@ -286,12 +325,15 @@ async function init() {
       window.location.search = nextParams.toString();
     },
     onRandom: randomFilm,
+    randomKey: "Space",
   });
   async function loadEntries() {
     const csvText = await fetch(getCsvUrl(currentSheet)).then((res) => res.text());
     cachedEntries = parseCsv(csvText)
       .filter((row) => row.name && row.year)
       .sort((a, b) => b.date.localeCompare(a.date));
+    const limit = getEntryLimit();
+    if (limit) cachedEntries = cachedEntries.slice(0, limit);
     renderEntries(cachedEntries);
   }
 

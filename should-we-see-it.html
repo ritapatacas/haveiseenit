@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-PT" data-script-url="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>should we see it?</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Space+Grotesk:wght@400;500;600&display=swap" />
+  <link rel="stylesheet" href="should-we-see-it.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <p class="hero__eyebrow">letterboxd watchlist picker</p>
+      <h1>should we see it?</h1>
+      <p class="hero__sub">Escreve um username e criamos uma sheet temporaria com a watchlist.</p>
+    </header>
+
+    <section class="panel">
+      <form id="scrape-form" class="panel__form" autocomplete="off">
+        <label class="field">
+          <span class="field__label">username no Letterboxd</span>
+          <input id="username" name="username" type="text" placeholder="ritsaptcs" required />
+        </label>
+        <button id="submit" type="submit">Scrape watchlist</button>
+        <p class="hint">Demora um pouco. Se o user for privado, nao vai funcionar.</p>
+      </form>
+
+      <div class="status" id="status" aria-live="polite"></div>
+
+      <div class="links" id="links" hidden>
+        <a id="sheet-link" target="_blank" rel="noopener noreferrer">Abrir sheet</a>
+        <a id="csv-link" target="_blank" rel="noopener noreferrer">Abrir CSV</a>
+      </div>
+    </section>
+
+    <section class="results" id="results" hidden>
+      <div class="results__header">
+        <div>
+          <h2>watchlist</h2>
+          <p id="results-meta"></p>
+        </div>
+        <button id="pick" type="button">Surpreende-me</button>
+      </div>
+      <div class="pick" id="pick-result" hidden></div>
+      <ol class="results__list" id="results-list"></ol>
+    </section>
+  </div>
+
+  <script src="should-we-see-it.js"></script>
+</body>
+</html>

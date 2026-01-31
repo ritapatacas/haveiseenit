@@ -3,29 +3,27 @@
     const panel = document.createElement("span");
     panel.className = "help-button__panel";
     panel.innerHTML =
-      "<span><strong>have i seen it?</strong></span>" +
-      "<input class=\"help-search\" type=\"search\" placeholder=\"search\" />" +
-      "<div class=\"help-section\"><span>shortcuts:</span>" +
-      "<span><button type=\"button\" class=\"help-action\" data-action=\"random\">random</button> - press space</span>" +
-      "<span><button type=\"button\" class=\"help-action\" data-action=\"toggle\">view</button> - press v</span>" +
-      "<span>help - press h</span>" +
-      "<span>search - press s</span></div>";
-
-    if (options && typeof options.onToggleList === "function") {
-      const toggle = document.createElement("button");
-      toggle.type = "button";
-      toggle.className = "help-toggle";
-      const current = options.currentList || "films";
-      toggle.innerHTML =
-        `<span class="help-toggle__item ${current === "films" ? "is-active" : ""}">films</span>` +
-        `<span class="help-toggle__item ${current === "watchlist" ? "is-active" : ""}">watchlist</span>`;
-      const keys = panel.querySelector(".help-section");
-      if (keys) {
-        keys.before(toggle);
-      } else {
-        panel.appendChild(toggle);
-      }
-    }
+      "<span class=\"help-title help-title--row\">have I seen it?</span>" +
+      "<div class=\"help-body\">" +
+      "<div class=\"help-modes\" role=\"tablist\" aria-label=\"Search mode\">" +
+      "<button type=\"button\" class=\"help-mode\" data-mode=\"seen\">seen</button>" +
+      "<button type=\"button\" class=\"help-mode\" data-mode=\"watchlist\">to watch</button>" +
+      "<button type=\"button\" class=\"help-mode\" data-mode=\"shared\">together</button>" +
+      "</div>" +
+      "<input class=\"help-search\" type=\"search\" />" +
+      "<div class=\"help-shared\">" +
+      "<span class=\"help-shared__hint\">Find films you both want to watch · watchlist matching</span>" +
+      "<form class=\"help-shared__form\" autocomplete=\"off\" data-lpignore=\"true\" data-1p-ignore=\"true\">" +
+      "<input class=\"help-shared__input\" type=\"search\" name=\"lb-user\" autocomplete=\"off\" autocapitalize=\"none\" autocorrect=\"off\" spellcheck=\"false\" inputmode=\"text\" data-lpignore=\"true\" data-1p-ignore=\"true\" data-bwignore=\"true\" data-kwignore=\"true\" data-form-type=\"other\" />" +
+      "</form>" +
+      "<span class=\"help-shared__status\" aria-live=\"polite\"></span>" +
+      "</div>" +
+      "<div class=\"help-section\"><span class=\"help-section__title\">shortcuts</span>" +
+      "<span><strong>Space</strong> — random</span>" +
+      "<span><strong>V</strong> — mode</span>" +
+      "<span><strong>H</strong> — shortcuts</span>" +
+      "<span><strong>S</strong> — search</span></div>" +
+      "</div>";
     return panel;
   }
 
@@ -33,18 +31,27 @@
     const panel = document.createElement("span");
     panel.className = "help-button__panel";
     panel.innerHTML =
-      "<span><strong>search</strong></span>" +
-      "<input class=\"help-search\" type=\"search\" placeholder=\"search\" />";
-    if (options && typeof options.onToggleList === "function") {
-      const toggle = document.createElement("button");
-      toggle.type = "button";
-      toggle.className = "help-toggle";
-      const current = options.currentList || "films";
-      toggle.innerHTML =
-        `<span class="help-toggle__item ${current === "films" ? "is-active" : ""}">films</span>` +
-        `<span class="help-toggle__item ${current === "watchlist" ? "is-active" : ""}">watchlist</span>`;
-      panel.appendChild(toggle);
-    }
+      "<span class=\"help-title help-title--row\">have I seen it?</span>" +
+      "<div class=\"help-body\">" +
+      "<div class=\"help-modes\" role=\"tablist\" aria-label=\"Search mode\">" +
+      "<button type=\"button\" class=\"help-mode\" data-mode=\"seen\">seen</button>" +
+      "<button type=\"button\" class=\"help-mode\" data-mode=\"watchlist\">to watch</button>" +
+      "<button type=\"button\" class=\"help-mode\" data-mode=\"shared\">together</button>" +
+      "</div>" +
+      "<input class=\"help-search\" type=\"search\" />" +
+      "<div class=\"help-shared\">" +
+      "<span class=\"help-shared__hint\">Find films you both want to watch · watchlist matching</span>" +
+      "<form class=\"help-shared__form\" autocomplete=\"off\" data-lpignore=\"true\" data-1p-ignore=\"true\">" +
+      "<input class=\"help-shared__input\" type=\"search\" name=\"lb-user\" placeholder=\"Enter Letterboxd username\" autocomplete=\"off\" autocapitalize=\"none\" autocorrect=\"off\" spellcheck=\"false\" inputmode=\"text\" data-lpignore=\"true\" data-1p-ignore=\"true\" data-bwignore=\"true\" data-kwignore=\"true\" data-form-type=\"other\" />" +
+      "</form>" +
+      "<span class=\"help-shared__status\" aria-live=\"polite\"></span>" +
+      "</div>" +
+      "<div class=\"help-section\"><span class=\"help-section__title\">shortcuts</span>" +
+      "<span><strong>Space</strong> — random</span>" +
+      "<span><strong>V</strong> — mode</span>" +
+      "<span><strong>H</strong> — shortcuts</span>" +
+      "<span><strong>S</strong> — search</span></div>" +
+      "</div>";
     return panel;
   }
 
@@ -53,11 +60,185 @@
     panel.className = "help-button__panel";
     panel.innerHTML =
       "<span><strong>shortcuts</strong></span>" +
-      "<span>view - press v</span>" +
-      "<span>random - press space</span>" +
-      "<span>help - press h</span>" +
-      "<span>search - press s</span>";
+      "<span><strong>Space</strong> — random</span>" +
+      "<span><strong>V</strong> — mode</span>" +
+      "<span><strong>H</strong> — shortcuts</span>" +
+      "<span><strong>S</strong> — search</span>";
     return panel;
+  }
+
+  function normalizeMode(value) {
+    if (value === "watchlist") return "watchlist";
+    if (value === "shared") return "shared";
+    return "seen";
+  }
+
+  function modeTitle(mode) {
+    if (mode === "watchlist") return "should I watch it?";
+    if (mode === "shared") return "should we watch it?";
+    return "have I seen it?";
+  }
+
+  function modePlaceholder(mode) {
+    if (mode === "watchlist") return "Search your watchlist";
+    if (mode === "shared") return "Search shared watchlist";
+    return "Search movies you've seen";
+  }
+
+  function updateSearchPlaceholder(panel, mode) {
+    const input = panel.querySelector(".help-search");
+    if (!input) return;
+    input.placeholder = modePlaceholder(mode);
+    input.classList.add("is-placeholder-fade");
+    window.setTimeout(() => input.classList.remove("is-placeholder-fade"), 120);
+  }
+
+  function updateModeTitle(panel, mode) {
+    const title = panel.querySelector(".help-title");
+    if (!title) return;
+    title.textContent = modeTitle(mode);
+  }
+
+  function updateSharedVisibility(panel, mode) {
+    const shared = panel.querySelector(".help-shared");
+    if (!shared) return;
+    const isShared = mode === "shared";
+    panel.classList.toggle("is-shared-mode", isShared);
+    if (!isShared) setSharedStatus(panel, "", "");
+  }
+
+  function isPanelOpen(panel) {
+    const desktop = panel.closest(".help-button");
+    if (desktop && !desktop.classList.contains("help-button--open")) return false;
+    const mobile = panel.closest(".mobile-help");
+    if (mobile && !mobile.classList.contains("is-open")) return false;
+    return true;
+  }
+
+  function focusSearch(panel) {
+    const input = panel.querySelector(".help-search");
+    if (input) input.focus();
+  }
+
+  function focusShared(panel) {
+    const sharedInput = panel.querySelector(".help-shared__input");
+    if (sharedInput) sharedInput.focus();
+  }
+
+  function setSharedStatus(panel, message, state) {
+    const status = panel.querySelector(".help-shared__status");
+    const shared = panel.querySelector(".help-shared");
+    if (!status || !shared) return;
+    status.textContent = message || "";
+    shared.classList.toggle("is-error", state === "error");
+    shared.classList.toggle("is-loading", state === "loading");
+  }
+
+  function setupSharedWatchlist(panel, options) {
+    const input = panel.querySelector(".help-shared__input");
+    if (!input) return null;
+    const form = panel.querySelector(".help-shared__form");
+    if (form) {
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+      });
+    }
+    const storageKey = "help:shared-username";
+    const stored = window.localStorage ? window.localStorage.getItem(storageKey) : "";
+    if (stored) input.value = stored;
+
+    const isValid = (value) => /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(value);
+
+    const submit = async () => {
+      const username = String(input.value || "").trim();
+      if (!username) {
+        setSharedStatus(panel, "Enter a username first.", "error");
+        return;
+      }
+      if (!isValid(username)) {
+        setSharedStatus(panel, "Invalid username.", "error");
+        return;
+      }
+
+      if (window.localStorage) {
+        window.localStorage.setItem(storageKey, username);
+      }
+
+      setSharedStatus(panel, "Loading…", "loading");
+
+      if (options && typeof options.onSharedWatchlistSubmit === "function") {
+        try {
+          const result = await options.onSharedWatchlistSubmit(username);
+          if (result && result.ok === false) {
+            setSharedStatus(panel, result.error || "Failed to load.", "error");
+          } else if (result && Array.isArray(result.items) && result.items.length === 0) {
+            setSharedStatus(panel, "No shared films found.", "");
+          } else {
+            setSharedStatus(panel, "", "");
+          }
+        } catch (err) {
+          setSharedStatus(panel, err && err.message ? err.message : "Failed to load.", "error");
+        }
+        return;
+      }
+
+      setSharedStatus(panel, "Shared watchlist not connected.", "error");
+    };
+
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        submit();
+      }
+    });
+
+    return { submit, input };
+  }
+
+  function setupHelpModes(panel, options) {
+    const modes = Array.from(panel.querySelectorAll(".help-mode"));
+    const currentList = options && options.currentList ? options.currentList : "films";
+    const initialMode = normalizeMode(options && options.currentMode ? options.currentMode : currentList);
+
+    const applyMode = (mode, notify) => {
+      const normalized = normalizeMode(mode);
+      modes.forEach((btn) => {
+        const isActive = btn.getAttribute("data-mode") === normalized;
+        btn.classList.toggle("is-active", isActive);
+        btn.setAttribute("aria-selected", isActive ? "true" : "false");
+      });
+      panel.dataset.mode = normalized;
+      updateModeTitle(panel, normalized);
+      updateSearchPlaceholder(panel, normalized);
+      updateSharedVisibility(panel, normalized);
+      if (isPanelOpen(panel)) {
+        const sharedInput = panel.querySelector(".help-shared__input");
+        if (normalized === "shared" && sharedInput && !sharedInput.value.trim()) {
+          focusShared(panel);
+        } else {
+          focusSearch(panel);
+        }
+      }
+      if (!notify) return;
+      if (options && typeof options.onModeChange === "function") {
+        options.onModeChange(normalized);
+      }
+      if (options && typeof options.onToggleList === "function") {
+        if (normalized === "seen") options.onToggleList("films");
+        if (normalized === "watchlist") options.onToggleList("watchlist");
+      }
+    };
+
+    modes.forEach((btn) => {
+      btn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        const mode = btn.getAttribute("data-mode") || "seen";
+        applyMode(mode, true);
+      });
+    });
+
+    applyMode(initialMode, false);
+    return { applyMode };
   }
 
   function createHelpUI(options) {
@@ -75,7 +256,7 @@
     iconWrap.className = "help-button__icon";
 
     const icon = document.createElement("i");
-    icon.className = "fa-regular fa-circle-question fa-fade";
+    icon.className = "fa-regular fa-question fa-fade";
     iconWrap.appendChild(icon);
 
     const panel = buildHelpPanel(options);
@@ -86,9 +267,21 @@
     close.setAttribute("aria-label", "Close help");
     close.textContent = "×";
 
-    button.append(iconWrap, panel, close);
+    panel.prepend(iconWrap);
+    button.append(panel, close);
 
-    const open = () => button.classList.add("help-button--open");
+    const open = () => {
+      button.classList.add("help-button--open");
+      const mode = panel.dataset.mode || "seen";
+      if (mode === "shared") {
+        const sharedInput = panel.querySelector(".help-shared__input");
+        if (sharedInput && !sharedInput.value.trim()) {
+          sharedInput.focus();
+          return;
+        }
+      }
+      if (input) input.focus();
+    };
     const closeMenu = () => {
       if (!button.classList.contains("help-button--open")) return;
       button.classList.remove("help-button--open");
@@ -116,19 +309,12 @@
     });
 
     const input = panel.querySelector(".help-search");
-    const toggle = panel.querySelector(".help-toggle");
+    const toggle = panel.querySelector(".help-modes");
     const actions = panel.querySelectorAll(".help-action");
+    setupSharedWatchlist(panel, options);
+    const modeState = setupHelpModes(panel, options);
     if (input) {
       input.addEventListener("click", (event) => event.stopPropagation());
-    }
-    if (toggle && options && typeof options.onToggleList === "function") {
-      toggle.addEventListener("click", (event) => {
-        event.stopPropagation();
-        const current =
-          toggle.querySelector(".help-toggle__item.is-active")?.textContent || "films";
-        const next = current === "films" ? "watchlist" : "films";
-        options.onToggleList(next);
-      });
     }
     actions.forEach((action) => {
       action.addEventListener("click", (event) => {
@@ -143,9 +329,28 @@
         }
       });
     });
+    if (toggle && modeState) {
+      toggle.addEventListener("click", (event) => event.stopPropagation());
+    }
+
+    let condensed = false;
+    const toggleCondensed = () => {
+      condensed = !condensed;
+      panel.classList.toggle("is-condensed", condensed);
+    };
 
     document.body.appendChild(button);
-    return { button, input, open, close: closeMenu, toggle, bar: null };
+    return {
+      button,
+      panel,
+      input,
+      open,
+      close: closeMenu,
+      toggle,
+      bar: null,
+      toggleCondensed,
+      modeState,
+    };
   }
 
   function createMobileHelpUI(options) {
@@ -186,7 +391,18 @@
 
     wrapper.append(trigger, menu, searchPanel);
 
-    const open = () => wrapper.classList.add("is-open");
+    const open = () => {
+      wrapper.classList.add("is-open");
+      const mode = searchPanel.dataset.mode || "seen";
+      if (mode === "shared") {
+        const sharedInput = searchPanel.querySelector(".help-shared__input");
+        if (sharedInput && !sharedInput.value.trim()) {
+          sharedInput.focus();
+          return;
+        }
+      }
+      if (input) input.focus();
+    };
     const closeMenu = () => wrapper.classList.remove("is-open");
     const isOpen = () => wrapper.classList.contains("is-open");
 
@@ -226,23 +442,36 @@
     });
 
     const input = searchPanel.querySelector(".help-search");
-    const toggle = searchPanel.querySelector(".help-toggle");
+    const toggle = searchPanel.querySelector(".help-modes");
+    setupSharedWatchlist(searchPanel, options);
+    const modeState = setupHelpModes(searchPanel, options);
     if (input) {
       input.addEventListener("click", (event) => event.stopPropagation());
     }
 
-    if (toggle && options && typeof options.onToggleList === "function") {
-      toggle.addEventListener("click", (event) => {
-        event.stopPropagation();
-        const current =
-          toggle.querySelector(".help-toggle__item.is-active")?.textContent || "films";
-        const next = current === "films" ? "watchlist" : "films";
-        options.onToggleList(next);
-      });
+    if (toggle && modeState) {
+      toggle.addEventListener("click", (event) => event.stopPropagation());
     }
 
+    let condensed = false;
+    const toggleCondensed = () => {
+      condensed = !condensed;
+      searchPanel.classList.toggle("is-condensed", condensed);
+    };
+
     document.body.appendChild(wrapper);
-    return { button: wrapper, input, open, close: closeMenu, toggle, bar: null, isOpen };
+    return {
+      button: wrapper,
+      panel: searchPanel,
+      input,
+      open,
+      close: closeMenu,
+      toggle,
+      bar: null,
+      isOpen,
+      toggleCondensed,
+      modeState,
+    };
   }
 
   function createMobileBar() {
@@ -272,26 +501,35 @@
 
     if ((key === "h" || key === "H") && !typingTarget) {
       if (openNow) {
-        help.close();
-        if (help.input) help.input.blur();
+        if (typeof help.toggleCondensed === "function") {
+          help.toggleCondensed();
+        }
       } else {
         help.open();
-        if (help.input) help.input.focus();
       }
-        event.preventDefault();
-        return;
-      }
+      event.preventDefault();
+      return;
+    }
 
-      if ((key === "s" || key === "S") && !typingTarget) {
+      if ((key === "s" || key === "S" || key === "/") && !typingTarget) {
         help.open();
         if (help.input) help.input.focus();
         event.preventDefault();
         return;
       }
 
-      if ((key === "v" || key === "V") && !typingTarget && typeof onToggleView === "function") {
-        onToggleView();
-        return;
+      if ((key === "v" || key === "V") && !typingTarget) {
+        if (help.modeState && typeof help.modeState.applyMode === "function") {
+          const current = help.button.querySelector(".help-mode.is-active")?.getAttribute("data-mode") || "seen";
+          const next = current === "seen" ? "watchlist" : current === "watchlist" ? "shared" : "seen";
+          help.modeState.applyMode(next, true);
+          event.preventDefault();
+          return;
+        }
+        if (typeof onToggleView === "function") {
+          onToggleView();
+          return;
+        }
       }
 
       if (!typingTarget && typeof onRandom === "function" && randomKey) {
@@ -323,12 +561,19 @@
     setupCommonHotkeys,
     setListToggle(toggle, current) {
       if (!toggle) return;
-      const items = toggle.querySelectorAll(".help-toggle__item");
+      const mode = normalizeMode(current === "films" || current === "watchlist" ? current : current);
+      const items = toggle.querySelectorAll(".help-mode");
       items.forEach((item) => {
-        const isFilms = item.textContent === "films";
-        const active = current === (isFilms ? "films" : "watchlist");
+        const active = item.getAttribute("data-mode") === mode;
         item.classList.toggle("is-active", active);
+        item.setAttribute("aria-selected", active ? "true" : "false");
       });
+      const panel = toggle.closest(".help-button__panel");
+      if (panel) {
+        updateModeTitle(panel, mode);
+        updateSearchPlaceholder(panel, mode);
+        updateSharedVisibility(panel, mode);
+      }
     },
   };
 })();

@@ -37,11 +37,22 @@
     matchItem.setAttribute("data-focusable", "true");
     matchItem.setAttribute("aria-expanded", "false");
     matchItem.innerHTML =
-      '<span class="help-menu__label">Match watchlist</span><span class="help-menu__chevron" aria-hidden="true">▸</span>';
+      '<span class="help-menu__label">Match watchlist (WIP)</span><span class="help-menu__chevron" aria-hidden="true">▸</span>';
 
     const matchDetails = document.createElement("div");
     matchDetails.className = "help-menu__details";
-    matchDetails.textContent = "find films you both want to watch";
+    const matchHint = document.createElement("div");
+    matchHint.textContent = "should we watch it?";
+    const matchInput = document.createElement("input");
+    matchInput.type = "search";
+    matchInput.name = "lb-usr";
+    matchInput.id = "lb-usr";
+    matchInput.placeholder = "letterboxd user";
+    matchInput.className = "help-inline-field";
+    matchInput.setAttribute("autocomplete", "off");
+    matchInput.setAttribute("spellcheck", "false");
+    matchInput.setAttribute("data-focusable", "true");
+    matchDetails.append(matchHint, matchInput);
     matchDetails.hidden = true;
 
     const divider = document.createElement("div");
@@ -53,37 +64,14 @@
     shortcutsItem.dataset.action = "shortcuts";
     shortcutsItem.setAttribute("role", "menuitem");
     shortcutsItem.setAttribute("data-focusable", "true");
+    shortcutsItem.setAttribute("aria-expanded", "true");
     shortcutsItem.innerHTML =
       '<span class="help-menu__label">Shortcuts</span><span class="help-menu__icon" aria-hidden="true">⌘</span>';
 
-    list.append(matchItem, matchDetails, divider, shortcutsItem);
-    menu.appendChild(list);
-
-    // Simple modal for shortcuts
-    const shortcutsModal = document.createElement("div");
-    shortcutsModal.className = "help-modal";
-    shortcutsModal.setAttribute("role", "dialog");
-    shortcutsModal.setAttribute("aria-modal", "true");
-    shortcutsModal.setAttribute("aria-label", "Keyboard shortcuts");
-    shortcutsModal.hidden = true;
-
-    const modalInner = document.createElement("div");
-    modalInner.className = "help-modal__inner";
-
-    const modalHeader = document.createElement("div");
-    modalHeader.className = "help-modal__header";
-    const modalTitle = document.createElement("h2");
-    modalTitle.className = "help-modal__title";
-    modalTitle.textContent = "Shortcuts";
-    const modalClose = document.createElement("button");
-    modalClose.type = "button";
-    modalClose.className = "help-modal__close";
-    modalClose.setAttribute("aria-label", "Close");
-    modalClose.textContent = "×";
-    modalHeader.append(modalTitle, modalClose);
-
-    const modalList = document.createElement("div");
-    modalList.className = "help-modal__list";
+    const shortcutsDetails = document.createElement("div");
+    shortcutsDetails.className = "help-menu__details";
+    const shortcutsList = document.createElement("div");
+    shortcutsList.className = "menu__shortcuts-list";
     const shortcutItems = [
       ["Space", "random"],
       ["V", "mode"],
@@ -100,18 +88,20 @@
       descEl.className = "help-modal__desc";
       descEl.textContent = desc;
       row.append(keyEl, descEl);
-      modalList.appendChild(row);
+      shortcutsList.appendChild(row);
     });
+    shortcutsDetails.append(shortcutsList);
+    shortcutsDetails.hidden = false;
 
-    modalInner.append(modalHeader, modalList);
-    shortcutsModal.appendChild(modalInner);
+    list.append(matchItem, matchDetails, divider, shortcutsItem, shortcutsDetails);
+    menu.appendChild(list);
 
     return {
       menu,
       matchItem,
       matchDetails,
       shortcutsItem,
-      shortcutsModal,
+      shortcutsDetails,
     };
   }
 
@@ -148,7 +138,7 @@
     btnHelp.setAttribute("aria-expanded", "false");
 
     const built = buildMenu(opts);
-    const { menu, matchItem, matchDetails, shortcutsItem, shortcutsModal } = built;
+    const { menu, matchItem, matchDetails, shortcutsItem, shortcutsDetails } = built;
     const modeButtons = [];
 
     const modeGroup = document.createElement("div");
@@ -311,7 +301,7 @@
 
       if ((key === "h" || key === "H") && !isTypingTarget(target)) {
         event.preventDefault();
-        toggleShortcutsModal();
+        toggleShortcutsDetails();
         return;
       }
 
@@ -345,20 +335,42 @@
       if (key === "Enter" && target instanceof HTMLElement) {
         if (target.dataset.action === "shortcuts") {
           event.preventDefault();
-          toggleShortcutsModal();
+          toggleShortcutsDetails();
           return;
         }
       }
     };
 
     // Match watchlist item (expand/collapse)
+    const closeAllDetails = () => {
+      matchDetails.hidden = true;
+      matchItem.setAttribute("aria-expanded", "false");
+      const chev = matchItem.querySelector(".help-menu__chevron");
+      if (chev) chev.textContent = "▸";
+      // shortcuts section stays visible
+      shortcutsDetails.hidden = false;
+      shortcutsItem.setAttribute("aria-expanded", "true");
+    };
+
     const toggleMatchDetails = () => {
       const willOpen = matchDetails.hidden;
-      matchDetails.hidden = !willOpen;
-      matchItem.setAttribute("aria-expanded", willOpen ? "true" : "false");
-      const chev = matchItem.querySelector(".help-menu__chevron");
-      if (chev) chev.textContent = willOpen ? "▾" : "▸";
+      closeAllDetails();
+      matchDetails.hidden = !willOpen ? true : false; // ensure current state respected after closeAll
+      if (willOpen) {
+        matchDetails.hidden = false;
+        matchItem.setAttribute("aria-expanded", "true");
+        const chev = matchItem.querySelector(".help-menu__chevron");
+        if (chev) chev.textContent = "▾";
+      }
       applyMode("shared", true);
+    };
+
+    const toggleShortcutsDetails = () => {
+      // Keep shortcuts always visible; just ensure focus lands inside.
+      shortcutsDetails.hidden = false;
+      shortcutsItem.setAttribute("aria-expanded", "true");
+      const firstShortcut = shortcutsDetails.querySelector(".help-modal__row");
+      if (firstShortcut && firstShortcut.focus) firstShortcut.focus();
     };
 
     matchItem.addEventListener("click", (event) => {
@@ -367,53 +379,9 @@
     });
 
     // Shortcuts modal helpers
-    const modalClose = shortcutsModal.querySelector(".help-modal__close");
-    const handleModalKey = (event) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        closeShortcutsModal();
-      }
-    };
-
-    const openShortcutsModal = () => {
-      shortcutsModal.hidden = false;
-      shortcutsModal.classList.add("is-open");
-      document.body.appendChild(shortcutsModal);
-      if (modalClose) modalClose.focus();
-      document.addEventListener("keydown", handleModalKey, true);
-    };
-
-    const closeShortcutsModal = () => {
-      shortcutsModal.hidden = true;
-      shortcutsModal.classList.remove("is-open");
-      document.removeEventListener("keydown", handleModalKey, true);
-      shortcutsItem.focus();
-    };
-
-    const toggleShortcutsModal = () => {
-      if (shortcutsModal.hidden) {
-        openShortcutsModal();
-      } else {
-        closeShortcutsModal();
-      }
-    };
-
-    if (modalClose) {
-      modalClose.addEventListener("click", (event) => {
-        event.stopPropagation();
-        closeShortcutsModal();
-      });
-    }
-
-    shortcutsModal.addEventListener("click", (event) => {
-      if (event.target === shortcutsModal) {
-        closeShortcutsModal();
-      }
-    });
-
     shortcutsItem.addEventListener("click", (event) => {
       event.stopPropagation();
-      openShortcutsModal();
+      toggleShortcutsDetails();
     });
 
     // Prevent menu closing when clicking inside
@@ -507,7 +475,7 @@
       toggle: modeGroup,
       modeState: { applyMode },
       isOpen: () => isOpen,
-      toggleCondensed: toggleShortcutsModal,
+      toggleCondensed: toggleShortcutsDetails,
     };
   }
 

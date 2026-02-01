@@ -104,22 +104,6 @@
   opacity: 1;
 }
 
-.help-inline-field {
-  border: 1px solid var(--help-border);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--help-text);
-  font: 200 12px/1.2 "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  outline: none;
-  width: 100%;
-  padding: 8px 8px;
-  margin-top: 8px;
-  border-radius: 10px;
-}
-
-.help-inline-field::placeholder {
-  color: var(--help-muted);
-}
-
 .help-inline-search::placeholder {
   color: var(--help-muted);
 }
@@ -467,12 +451,6 @@
   width: 100%;
   box-sizing: border-box;
   word-break: break-word;
-}
-
-.help-menu__divider {
-  height: 1px;
-  margin: 4px 8px;
-  background: var(--help-border);
 }
 
 .help-modal[hidden] {

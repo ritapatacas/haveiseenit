@@ -1,114 +1,13 @@
-const SHEET_ID = "1sP2Tkz00oTiVoACyCznYBOqTaUecUVbUKSQUWVsQDe4";
-const DEFAULT_SHEET = "films";
-
-function getCsvUrl(sheetName) {
-  return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
-    sheetName
-  )}`;
-}
-
 const feed = document.getElementById("feed");
 let cachedEntries = [];
 let clipPosts = [];
 let clipsReady = false;
 let clipTicking = false;
-let currentSheet = DEFAULT_SHEET;
+let currentSheet = window.AppData.DEFAULT_SHEET;
 
 function getEntryLimit() {
   const isSmall = window.matchMedia("(max-width: 768px)").matches;
   return isSmall ? 40 : null;
-}
-
-function parseCsvLine(line) {
-  const out = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-
-    if (ch === "," && !inQuotes) {
-      out.push(current);
-      current = "";
-      continue;
-    }
-
-    current += ch;
-  }
-
-  out.push(current);
-  return out;
-}
-
-function parseCsv(text) {
-  const rows = [];
-  let row = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < text.length; i += 1) {
-    const ch = text[i];
-
-    if (ch === '"') {
-      if (inQuotes && text[i + 1] === '"') {
-        current += '"';
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-
-    if (ch === "," && !inQuotes) {
-      row.push(current);
-      current = "";
-      continue;
-    }
-
-    if ((ch === "\n" || ch === "\r") && !inQuotes) {
-      if (ch === "\r" && text[i + 1] === "\n") i += 1;
-      row.push(current);
-      rows.push(row);
-      row = [];
-      current = "";
-      continue;
-    }
-
-    current += ch;
-  }
-
-  if (current.length || row.length) {
-    row.push(current);
-    rows.push(row);
-  }
-
-  if (rows.length <= 1) return [];
-  rows.shift();
-
-  return rows
-    .filter((cols) => cols.length >= 4)
-    .map((cols) => ({
-      date: cols[0],
-      name: cols[1],
-      year: cols[2],
-      letterboxdUri: cols[3] || "",
-      filmUri: cols[4] || "",
-      image: cols[5] || "",
-      poster: cols[6] || "",
-      genre: cols[7] || "",
-      director: cols[8] || "",
-      rating: cols[9] || "",
-      review: cols[10] || "",
-    }));
 }
 
 function ratingToStars(rating) {
@@ -236,7 +135,7 @@ function setupSearch(input) {
   input.addEventListener("input", () => {
     const query = input.value.trim().toLowerCase();
     if (!query) {
-      renderEntries(cachedEntries);
+      renderEntries(cachedEntries, "");
       return;
     }
 
@@ -261,11 +160,11 @@ function setupSearch(input) {
       .sort((a, b) => b.score - a.score || b.entry.date.localeCompare(a.entry.date))
       .map((item) => item.entry);
 
-    renderEntries(scored);
+    renderEntries(scored, query);
   });
 }
 
-function renderEntries(entries) {
+function renderEntries(entries, searchQuery = "") {
   feed.innerHTML = "";
   const usePoster = window.matchMedia("(orientation: portrait)").matches;
 
@@ -285,7 +184,14 @@ function renderEntries(entries) {
   });
 
   if (!feed.children.length) {
-    feed.innerHTML = "<div class=\"loading\">No backdrops found.</div>";
+    const q = (searchQuery || "it").trim() || "it";
+    const letterboxdWatchlist = "https://letterboxd.com/ritsaptcs/watchlist/";
+    const letterboxdSearch = `https://letterboxd.com/search/${encodeURIComponent(q)}`;
+    const msg =
+      currentSheet === "watchlist"
+        ? `Should I watch <u>${q}</u>?\n\nmaybe, but it's not in your <a href="${letterboxdWatchlist}" target="_blank" rel="noopener noreferrer">watchlist</a>`
+        : `Have I seen <u>${q}</u>?</br>\nno. (<a href="${letterboxdSearch}" target="_blank" rel="noopener noreferrer">did I</a>?)`;
+    feed.innerHTML = `<div class="loading"><span>${msg.replace(/\n/g, "<br>")}</span></div>`;
     return;
   }
 
@@ -328,13 +234,13 @@ async function init() {
     randomKey: "Space",
   });
   async function loadEntries() {
-    const csvText = await fetch(getCsvUrl(currentSheet)).then((res) => res.text());
-    cachedEntries = parseCsv(csvText)
+    const csvText = await fetch(window.AppData.getCsvUrl(currentSheet)).then((res) => res.text());
+    cachedEntries = window.AppData.parseCsv(csvText)
       .filter((row) => row.name && row.year)
       .sort((a, b) => b.date.localeCompare(a.date));
     const limit = getEntryLimit();
     if (limit) cachedEntries = cachedEntries.slice(0, limit);
-    renderEntries(cachedEntries);
+    renderEntries(cachedEntries, help.input?.value?.trim() ?? "");
   }
 
   setupSearch(help.input);

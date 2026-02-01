@@ -1,69 +1,4 @@
-const SHEET_ID = "1sP2Tkz00oTiVoACyCznYBOqTaUecUVbUKSQUWVsQDe4";
-const DEFAULT_SHEET = "films";
-
-function getCsvUrl(sheetName) {
-  return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
-    sheetName
-  )}`;
-}
-
 const columnsRoot = document.getElementById("columns");
-
-function parseCsvLine(line) {
-  const out = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-
-    if (ch === "," && !inQuotes) {
-      out.push(current);
-      current = "";
-      continue;
-    }
-
-    current += ch;
-  }
-
-  out.push(current);
-  return out;
-}
-
-function parseCsv(text) {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length <= 1) return [];
-
-  const rows = [];
-  for (let i = 1; i < lines.length; i += 1) {
-    const cols = parseCsvLine(lines[i]);
-    if (cols.length < 7) continue;
-    rows.push({
-      date: cols[0],
-      name: cols[1],
-      year: cols[2],
-      letterboxdUri: cols[3] || "",
-      filmUri: cols[4] || "",
-      image: cols[5] || "",
-      poster: cols[6] || "",
-      genre: cols[7] || "",
-      director: cols[8] || "",
-      rating: cols[9] || "",
-      review: cols[10] || "",
-    });
-  }
-
-  return rows;
-}
 
 function getColumnCount() {
   const w = window.innerWidth;
@@ -508,7 +443,7 @@ let cachedEntries = [];
 let columnEls = [];
 let columnData = [];
 let columnOffset = 0;
-let currentSheet = DEFAULT_SHEET;
+let currentSheet = window.AppData.DEFAULT_SHEET;
 let renderToken = 0;
 let isProgrammaticFocus = false;
 
@@ -629,8 +564,8 @@ async function init() {
     randomKey: null,
   });
   async function loadEntries() {
-    const csvText = await fetch(getCsvUrl(currentSheet)).then((res) => res.text());
-    cachedEntries = parseCsv(csvText)
+    const csvText = await fetch(window.AppData.getCsvUrl(currentSheet)).then((res) => res.text());
+    cachedEntries = window.AppData.parseCsv(csvText)
       .filter((row) => row.name && row.year)
       .sort((a, b) => b.date.localeCompare(a.date));
     const limit = getEntryLimit();
@@ -664,12 +599,11 @@ init();
 window.addEventListener("keydown", (event) => {
   if (event.code !== "Space") return;
   const target = event.target;
-  if (
-    target &&
-    (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)
-  ) {
-    return;
-  }
+  const active = document.activeElement;
+  const isTyping =
+    (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) ||
+    (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable));
+  if (isTyping) return;
   event.preventDefault();
   triggerSlotSpin();
 });

@@ -29,9 +29,14 @@
   const commonScript = document.createElement("script");
   commonScript.src = "common.js";
   commonScript.onload = () => {
-    const script = document.createElement("script");
-    script.src = useColumns ? "columnsview.js" : "fullview.js";
-    document.body.appendChild(script);
+    const dataScript = document.createElement("script");
+    dataScript.src = "data.js";
+    dataScript.onload = () => {
+      const script = document.createElement("script");
+      script.src = useColumns ? "columnsview.js" : "fullview.js";
+      document.body.appendChild(script);
+    };
+    document.body.appendChild(dataScript);
   };
   document.body.appendChild(commonScript);
 })();

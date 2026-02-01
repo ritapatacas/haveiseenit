@@ -86,4 +86,10 @@ body {
   font-size: 12px;
   pointer-events: none;
 }
+
+.loading a {
+  pointer-events: auto;
+  color: inherit;
+  text-decoration: underline;
+}
 .card h2 strong { font-weight: 700; }

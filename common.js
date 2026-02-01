@@ -1,5 +1,4 @@
 (() => {
-  const MODE_ORDER = ["seen", "watchlist"];
   const MODE_TITLES = {
     seen: "have i seen it",
     watchlist: "should i watch it"
@@ -8,7 +7,6 @@
     seen: "search movies you've seen",
     watchlist: "search your watchlist",
   };
-  const STORAGE_KEY = "help:shared-username";
 
   const isTypingTarget = (el) =>
     el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
@@ -27,35 +25,6 @@
     const list = document.createElement("div");
     list.className = "help-menu__list";
 
-    const matchItem = document.createElement("button");
-    matchItem.type = "button";
-    matchItem.className = "help-menu__item";
-    matchItem.dataset.mode = "shared";
-    matchItem.setAttribute("role", "menuitem");
-    matchItem.setAttribute("data-focusable", "true");
-    matchItem.setAttribute("aria-expanded", "false");
-    matchItem.innerHTML =
-      '<span class="help-menu__label">Match watchlist (WIP)</span><span class="help-menu__chevron" aria-hidden="true">▸</span>';
-
-    const matchDetails = document.createElement("div");
-    matchDetails.className = "help-menu__details";
-    const matchHint = document.createElement("div");
-    matchHint.textContent = "should we watch it?";
-    const matchInput = document.createElement("input");
-    matchInput.type = "search";
-    matchInput.name = "lb-usr";
-    matchInput.id = "lb-usr";
-    matchInput.placeholder = "letterboxd user";
-    matchInput.className = "help-inline-field";
-    matchInput.setAttribute("autocomplete", "off");
-    matchInput.setAttribute("spellcheck", "false");
-    matchInput.setAttribute("data-focusable", "true");
-    matchDetails.append(matchHint, matchInput);
-    matchDetails.hidden = true;
-
-    const divider = document.createElement("div");
-    divider.className = "help-menu__divider";
-
     const shortcutsItem = document.createElement("button");
     shortcutsItem.type = "button";
     shortcutsItem.className = "help-menu__item";
@@ -70,13 +39,12 @@
     shortcutsDetails.className = "help-menu__details";
     const shortcutsList = document.createElement("div");
     shortcutsList.className = "menu__shortcuts-list";
-    const shortcutItems = [
+    [
       ["space", "random"],
       ["tab", "toggle list"],
       ["v", "toggle view"],
       ["s", "search"],
-    ];
-    shortcutItems.forEach(([key, desc]) => {
+    ].forEach(([key, desc]) => {
       const row = document.createElement("div");
       row.className = "help-modal__row";
       const keyEl = document.createElement("span");
@@ -89,18 +57,11 @@
       shortcutsList.appendChild(row);
     });
     shortcutsDetails.append(shortcutsList);
-    shortcutsDetails.hidden = false;
 
-    list.append(matchItem, matchDetails, divider, shortcutsItem, shortcutsDetails);
+    list.append(shortcutsItem, shortcutsDetails);
     menu.appendChild(list);
 
-    return {
-      menu,
-      matchItem,
-      matchDetails,
-      shortcutsItem,
-      shortcutsDetails,
-    };
+    return { menu, shortcutsItem, shortcutsDetails };
   }
 
   function createHelpUI(options) {
@@ -136,8 +97,7 @@
     btnHelp.setAttribute("aria-expanded", "false");
 
     const built = buildMenu(opts);
-    const { menu, matchItem, matchDetails, shortcutsItem, shortcutsDetails } = built;
-    const modeButtons = [];
+    const { menu, shortcutsItem, shortcutsDetails } = built;
 
     const modeGroup = document.createElement("div");
     modeGroup.className = "mode-buttons";
@@ -165,16 +125,6 @@
       const normalized = normalizeMode(mode);
       activeMode = normalized;
       lastModeChosen = true;
-      modeButtons.forEach((btn) => {
-        const isActive = btn.dataset.mode === normalized;
-        btn.classList.toggle("is-active", isActive);
-        btn.setAttribute("aria-checked", isActive ? "true" : "false");
-        if (btn.classList.contains("help-mode-item--expand")) {
-          btn.setAttribute("aria-expanded", isActive ? "true" : "false");
-          const chev = btn.querySelector(".help-mode-item__chevron");
-          if (chev) chev.textContent = isActive ? "▾" : "▸";
-        }
-      });
       [btnSeen, btnWatch].forEach((btn) => {
         const isActive = btn.dataset.mode === normalized;
         btn.classList.toggle("is-active", isActive);
@@ -242,12 +192,10 @@
       window.addEventListener("resize", positionMenu);
       window.addEventListener("scroll", positionMenu, true);
 
-      // Focus rule
       if (lastModeChosen) {
         searchInput.focus();
       } else {
-        const firstMode = modeButtons[0] || matchItem;
-        if (firstMode && firstMode.focus) firstMode.focus();
+        shortcutsItem.focus();
       }
     };
 
@@ -309,8 +257,9 @@
       }
 
       if (key === " " || key === "Spacebar") {
+        const typing = isTypingTarget(target) || isTypingTarget(document.activeElement);
         const shouldRandom =
-          !isTypingTarget(target) &&
+          !typing &&
           typeof opts.onRandom === "function" &&
           (!opts.randomKey || opts.randomKey === "Space");
         if (shouldRandom) {
@@ -344,43 +293,13 @@
       }
     };
 
-    // Match watchlist item (expand/collapse)
-    const closeAllDetails = () => {
-      matchDetails.hidden = true;
-      matchItem.setAttribute("aria-expanded", "false");
-      const chev = matchItem.querySelector(".help-menu__chevron");
-      if (chev) chev.textContent = "▸";
-      // shortcuts section stays visible
-      shortcutsDetails.hidden = false;
-      shortcutsItem.setAttribute("aria-expanded", "true");
-    };
-
-    const toggleMatchDetails = () => {
-      const willOpen = matchDetails.hidden;
-      closeAllDetails();
-      matchDetails.hidden = !willOpen ? true : false; // ensure current state respected after closeAll
-      if (willOpen) {
-        matchDetails.hidden = false;
-        matchItem.setAttribute("aria-expanded", "true");
-        const chev = matchItem.querySelector(".help-menu__chevron");
-        if (chev) chev.textContent = "▾";
-      }
-    };
-
     const toggleShortcutsDetails = () => {
-      // Keep shortcuts always visible; just ensure focus lands inside.
       shortcutsDetails.hidden = false;
       shortcutsItem.setAttribute("aria-expanded", "true");
       const firstShortcut = shortcutsDetails.querySelector(".help-modal__row");
       if (firstShortcut && firstShortcut.focus) firstShortcut.focus();
     };
 
-    matchItem.addEventListener("click", (event) => {
-      event.stopPropagation();
-      toggleMatchDetails();
-    });
-
-    // Shortcuts modal helpers
     shortcutsItem.addEventListener("click", (event) => {
       event.stopPropagation();
       toggleShortcutsDetails();
@@ -449,11 +368,18 @@
         collapseInlineSearch();
         return;
       }
+      if (event.key === " " || event.key === "Spacebar") {
+        event.preventDefault();
+        const start = inlineSearch.selectionStart ?? inlineSearch.value.length;
+        const end = inlineSearch.selectionEnd ?? start;
+        const val = inlineSearch.value;
+        inlineSearch.value = val.slice(0, start) + " " + val.slice(end);
+        inlineSearch.setSelectionRange(start + 1, start + 1);
+        syncInlineToMenu();
+        return;
+      }
       if (event.key === "Enter") {
         event.preventDefault();
-        openMenu();
-        syncInlineToMenu();
-        if (searchInput) searchInput.focus();
       }
     });
 
@@ -565,7 +491,8 @@
       }
 
       const isSpace = key === " " || key === "Spacebar";
-      if (!isTypingTarget(target) && typeof onRandom === "function" && isSpace) {
+      const typing = isTypingTarget(target) || isTypingTarget(document.activeElement);
+      if (!typing && typeof onRandom === "function" && isSpace) {
         const allowed = !randomKey || randomKey === "Space";
         if (allowed) {
           event.preventDefault();

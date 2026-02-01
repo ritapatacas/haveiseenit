@@ -1,5 +1,5 @@
 (() => {
-  const MODE_ORDER = ["seen", "watchlist", "shared"];
+  const MODE_ORDER = ["seen", "watchlist"];
   const MODE_TITLES = {
     seen: "have i seen it",
     watchlist: "should i watch it"
@@ -7,7 +7,6 @@
   const MODE_PLACEHOLDER = {
     seen: "search movies you've seen",
     watchlist: "search your watchlist",
-    shared: "search shared watchlist",
   };
   const STORAGE_KEY = "help:shared-username";
 
@@ -16,7 +15,6 @@
 
   const normalizeMode = (value) => {
     if (value === "watchlist") return "watchlist";
-    if (value === "shared") return "shared";
     return "seen";
   };
 
@@ -73,10 +71,10 @@
     const shortcutsList = document.createElement("div");
     shortcutsList.className = "menu__shortcuts-list";
     const shortcutItems = [
-      ["Space", "random"],
-      ["V", "mode"],
-      ["H", "shortcuts"],
-      ["S", "search"],
+      ["space", "random"],
+      ["tab", "toggle list"],
+      ["v", "toggle view"],
+      ["s", "search"],
     ];
     shortcutItems.forEach(([key, desc]) => {
       const row = document.createElement("div");
@@ -269,8 +267,7 @@
     };
 
     const cycleMode = () => {
-      const idx = MODE_ORDER.indexOf(activeMode);
-      const next = MODE_ORDER[(idx + 1) % MODE_ORDER.length];
+      const next = activeMode === "seen" ? "watchlist" : "seen";
       applyMode(next, true);
     };
 
@@ -289,13 +286,19 @@
 
       if ((key === "s" || key === "S") && !isTypingTarget(target)) {
         event.preventDefault();
-        searchInput.focus();
+        openInlineSearch();
+        return;
+      }
+
+      if (key === "Tab" && !isTypingTarget(target)) {
+        event.preventDefault();
+        cycleMode();
         return;
       }
 
       if ((key === "v" || key === "V") && !isTypingTarget(target)) {
         event.preventDefault();
-        cycleMode();
+        if (typeof opts.onToggleView === "function") opts.onToggleView();
         return;
       }
 
@@ -362,7 +365,6 @@
         const chev = matchItem.querySelector(".help-menu__chevron");
         if (chev) chev.textContent = "▾";
       }
-      applyMode("shared", true);
     };
 
     const toggleShortcutsDetails = () => {
@@ -412,6 +414,9 @@
       inlineSearch.focus();
       inlineSearch.select();
       syncInlineToMenu();
+    };
+    const openInlineSearch = () => {
+      expandInlineSearch();
     };
 
     const syncInlineToMenu = () => {
@@ -473,9 +478,10 @@
       open: openMenu,
       close: closeMenu,
       toggle: modeGroup,
-      modeState: { applyMode },
+      modeState: { applyMode, getMode: () => activeMode },
       isOpen: () => isOpen,
       toggleCondensed: toggleShortcutsDetails,
+      openSearch: openInlineSearch,
     };
   }
 
@@ -491,9 +497,7 @@
     const menu = toggle.closest(".help-menu");
     if (menu) {
       const title = menu.querySelector(".help-menu__title");
-      const shared = menu.querySelector(".help-menu__shared");
       if (title) title.textContent = MODE_TITLES[mode];
-      if (shared) shared.hidden = mode !== "shared";
     }
     const bar = toggle.closest(".menu");
     if (bar) {
@@ -530,25 +534,38 @@
 
       if ((key === "s" || key === "S" || key === "/") && !isTypingTarget(target)) {
         event.preventDefault();
-        help.open();
-        if (help.input) help.input.focus();
+        if (help.openSearch) {
+          help.openSearch();
+          return;
+        }
+        if (help.input) {
+          help.input.focus();
+          return;
+        }
+      }
+
+      if (key === "Tab" && !isTypingTarget(target)) {
+        event.preventDefault();
+        if (help.modeState && typeof help.modeState.applyMode === "function") {
+          const current =
+            (help.modeState.getMode && help.modeState.getMode()) ||
+            help.panel?.dataset.mode ||
+            "seen";
+          const next = current === "watchlist" ? "seen" : "watchlist";
+          help.modeState.applyMode(next, true);
+          return;
+        }
         return;
       }
 
       if ((key === "v" || key === "V") && !isTypingTarget(target)) {
         event.preventDefault();
-        if (help.modeState && typeof help.modeState.applyMode === "function") {
-          const current = help.button.querySelector(".help-mode-item.is-active")?.dataset.mode || "seen";
-          const next = current === "seen" ? "watchlist" : current === "watchlist" ? "shared" : "seen";
-          help.modeState.applyMode(next, true);
-          return;
-        }
         if (typeof onToggleView === "function") onToggleView();
         return;
       }
 
       const isSpace = key === " " || key === "Spacebar";
-      if (!isTypingTarget(target) && openNow && typeof onRandom === "function" && isSpace) {
+      if (!isTypingTarget(target) && typeof onRandom === "function" && isSpace) {
         const allowed = !randomKey || randomKey === "Space";
         if (allowed) {
           event.preventDefault();

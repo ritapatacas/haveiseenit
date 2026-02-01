@@ -2,13 +2,12 @@
   const MODE_ORDER = ["seen", "watchlist", "shared"];
   const MODE_TITLES = {
     seen: "have i seen it",
-    watchlist: "should I watch it",
-    shared: "should we watch it",
+    watchlist: "should i watch it"
   };
   const MODE_PLACEHOLDER = {
-    seen: "Search movies you've seen",
-    watchlist: "Search your watchlist",
-    shared: "Search shared watchlist",
+    seen: "search movies you've seen",
+    watchlist: "search your watchlist",
+    shared: "search shared watchlist",
   };
   const STORAGE_KEY = "help:shared-username";
 
@@ -21,94 +20,70 @@
     return "seen";
   };
 
-  function buildMenu(options) {
+  function buildMenu() {
     const menu = document.createElement("div");
-    menu.className = "help-menu";
+    menu.className = "help-menu help-menu--m3";
     menu.setAttribute("role", "menu");
     menu.tabIndex = -1;
 
-    // Section: Modes
-    const modesSection = document.createElement("div");
-    modesSection.className = "help-menu__section help-menu__section--modes";
-    const modesLabel = document.createElement("div");
-    modesLabel.className = "help-menu__section-label";
-    modesLabel.textContent = "have i seen it";
-    const modesGroup = document.createElement("div");
-    modesGroup.className = "help-menu__modes";
-    modesGroup.setAttribute("role", "group");
-    const modeButtons = MODE_ORDER.map((mode) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "help-mode-item";
-      btn.dataset.mode = mode;
-      btn.setAttribute("data-focusable", "true");
-      btn.setAttribute("role", "menuitemradio");
-      btn.setAttribute("aria-checked", mode === "seen" ? "true" : "false");
-      btn.textContent = mode === "watchlist" ? "To watch" : mode === "shared" ? "Together" : "Seen";
-      modesGroup.appendChild(btn);
-      return btn;
-    });
-    modesSection.append(modesLabel, modesGroup);
+    const list = document.createElement("div");
+    list.className = "help-menu__list";
 
-    // Section: Question + Search
-    const questionBlock = document.createElement("div");
-    questionBlock.className = "help-menu__section help-menu__question";
-    const questionTitle = document.createElement("div");
-    questionTitle.className = "help-menu__title";
-    questionTitle.textContent = MODE_TITLES.seen;
-    const searchWrap = document.createElement("div");
-    searchWrap.className = "help-menu__search";
-    const searchInput = document.createElement("input");
-    searchInput.type = "search";
-    searchInput.className = "help-input help-input--search";
-    searchInput.placeholder = MODE_PLACEHOLDER.seen;
-    searchInput.setAttribute("data-focusable", "true");
-    searchInput.setAttribute("aria-label", "Search");
-    searchWrap.appendChild(searchInput);
-    questionBlock.append(questionTitle, searchWrap);
+    const matchItem = document.createElement("button");
+    matchItem.type = "button";
+    matchItem.className = "help-menu__item";
+    matchItem.dataset.mode = "shared";
+    matchItem.setAttribute("role", "menuitem");
+    matchItem.setAttribute("data-focusable", "true");
+    matchItem.setAttribute("aria-expanded", "false");
+    matchItem.innerHTML =
+      '<span class="help-menu__label">Match watchlist</span><span class="help-menu__chevron" aria-hidden="true">▸</span>';
 
-    // Section: Together-only
-    const sharedSection = document.createElement("div");
-    sharedSection.className = "help-menu__section help-menu__shared";
-    sharedSection.hidden = true;
-    const sharedHint = document.createElement("div");
-    sharedHint.className = "help-menu__micro";
-    sharedHint.textContent = "Find films you both want to watch · watchlist matching";
-    const sharedInput = document.createElement("input");
-    sharedInput.type = "search";
-    sharedInput.className = "help-input help-input--shared";
-    sharedInput.placeholder = "Letterboxd username";
-    sharedInput.setAttribute("autocomplete", "off");
-    sharedInput.setAttribute("spellcheck", "false");
-    sharedInput.setAttribute("inputmode", "text");
-    sharedInput.setAttribute("data-focusable", "true");
-    const sharedStatus = document.createElement("div");
-    sharedStatus.className = "help-shared__status";
-    sharedSection.append(sharedHint, sharedInput, sharedStatus);
+    const matchDetails = document.createElement("div");
+    matchDetails.className = "help-menu__details";
+    matchDetails.textContent = "find films you both want to watch";
+    matchDetails.hidden = true;
 
-    // Section: Actions
-    const actionsSection = document.createElement("div");
-    actionsSection.className = "help-menu__section help-menu__actions";
-    const randomBtn = document.createElement("button");
-    randomBtn.type = "button";
-    randomBtn.className = "help-menu__action";
-    randomBtn.textContent = "Random";
-    randomBtn.setAttribute("data-focusable", "true");
-    randomBtn.dataset.action = "random";
-    randomBtn.setAttribute("aria-keyshortcuts", "Space");
+    const divider = document.createElement("div");
+    divider.className = "help-menu__divider";
 
-    const shortcutsToggle = document.createElement("button");
-    shortcutsToggle.type = "button";
-    shortcutsToggle.className = "help-menu__action";
-    shortcutsToggle.textContent = "Shortcuts";
-    shortcutsToggle.setAttribute("data-focusable", "true");
-    shortcutsToggle.dataset.action = "shortcuts";
-    shortcutsToggle.setAttribute("aria-expanded", "false");
+    const shortcutsItem = document.createElement("button");
+    shortcutsItem.type = "button";
+    shortcutsItem.className = "help-menu__item";
+    shortcutsItem.dataset.action = "shortcuts";
+    shortcutsItem.setAttribute("role", "menuitem");
+    shortcutsItem.setAttribute("data-focusable", "true");
+    shortcutsItem.innerHTML =
+      '<span class="help-menu__label">Shortcuts</span><span class="help-menu__icon" aria-hidden="true">⌘</span>';
 
-    const shortcutsWrap = document.createElement("div");
-    shortcutsWrap.className = "help-shortcuts";
-    const shortcutsGrid = document.createElement("div");
-    shortcutsGrid.className = "help-shortcuts__grid";
+    list.append(matchItem, matchDetails, divider, shortcutsItem);
+    menu.appendChild(list);
+
+    // Simple modal for shortcuts
+    const shortcutsModal = document.createElement("div");
+    shortcutsModal.className = "help-modal";
+    shortcutsModal.setAttribute("role", "dialog");
+    shortcutsModal.setAttribute("aria-modal", "true");
+    shortcutsModal.setAttribute("aria-label", "Keyboard shortcuts");
+    shortcutsModal.hidden = true;
+
+    const modalInner = document.createElement("div");
+    modalInner.className = "help-modal__inner";
+
+    const modalHeader = document.createElement("div");
+    modalHeader.className = "help-modal__header";
+    const modalTitle = document.createElement("h2");
+    modalTitle.className = "help-modal__title";
+    modalTitle.textContent = "Shortcuts";
+    const modalClose = document.createElement("button");
+    modalClose.type = "button";
+    modalClose.className = "help-modal__close";
+    modalClose.setAttribute("aria-label", "Close");
+    modalClose.textContent = "×";
+    modalHeader.append(modalTitle, modalClose);
+
+    const modalList = document.createElement("div");
+    modalList.className = "help-modal__list";
     const shortcutItems = [
       ["Space", "random"],
       ["V", "mode"],
@@ -117,46 +92,38 @@
     ];
     shortcutItems.forEach(([key, desc]) => {
       const row = document.createElement("div");
-      row.className = "help-shortcuts__item";
+      row.className = "help-modal__row";
       const keyEl = document.createElement("span");
-      keyEl.className = "help-shortcuts__key";
+      keyEl.className = "help-modal__key";
       keyEl.textContent = key;
       const descEl = document.createElement("span");
-      descEl.className = "help-shortcuts__desc";
+      descEl.className = "help-modal__desc";
       descEl.textContent = desc;
       row.append(keyEl, descEl);
-      shortcutsGrid.appendChild(row);
+      modalList.appendChild(row);
     });
-    shortcutsWrap.appendChild(shortcutsGrid);
 
-    actionsSection.append(randomBtn, shortcutsToggle, shortcutsWrap);
-
-    menu.append(modesSection, questionBlock, sharedSection, actionsSection);
+    modalInner.append(modalHeader, modalList);
+    shortcutsModal.appendChild(modalInner);
 
     return {
       menu,
-      modesGroup,
-      modeButtons,
-      questionTitle,
-      searchInput,
-      sharedSection,
-      sharedInput,
-      sharedStatus,
-      randomBtn,
-      shortcutsToggle,
-      shortcutsWrap,
+      matchItem,
+      matchDetails,
+      shortcutsItem,
+      shortcutsModal,
     };
   }
 
   function createHelpUI(options) {
     const opts = options || {};
     const container = document.createElement("div");
-    container.className = "help-bar";
+    container.className = "menu";
 
     const makeBtn = (icon, label) => {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "help-bar__btn";
+      btn.className = "menu__btn";
       btn.innerHTML = `<i class="${icon}" aria-hidden="true"></i><span class="sr-only">${label}</span>`;
       btn.setAttribute("aria-label", label);
       return btn;
@@ -166,12 +133,12 @@
     const btnWatch = makeBtn("fa-regular fa-eye-slash", "To watch");
     const btnSearch = makeBtn("fa-solid fa-magnifying-glass", "Search");
     const btnHelp = makeBtn("fa-solid fa-ellipsis-vertical", "Help and shortcuts");
-    btnHelp.classList.add("help-bar__btn--help");
-    btnSearch.classList.add("help-bar__btn--search");
+    btnHelp.classList.add("menu__btn--help");
+    btnSearch.classList.add("menu__btn--search");
     const inlineSearch = document.createElement("input");
     inlineSearch.type = "search";
     inlineSearch.className = "help-inline-search";
-    inlineSearch.placeholder = "Search";
+    inlineSearch.placeholder = MODE_PLACEHOLDER.seen;
     inlineSearch.setAttribute("aria-label", "Search");
     btnSearch.appendChild(inlineSearch);
     btnSeen.dataset.mode = "seen";
@@ -181,44 +148,21 @@
     btnHelp.setAttribute("aria-expanded", "false");
 
     const built = buildMenu(opts);
-    const {
-      menu,
-      modesGroup,
-      modeButtons,
-      questionTitle,
-      searchInput,
-      sharedSection,
-      sharedInput,
-      sharedStatus,
-      randomBtn,
-      shortcutsToggle,
-      shortcutsWrap,
-    } = built;
+    const { menu, matchItem, matchDetails, shortcutsItem, shortcutsModal } = built;
+    const modeButtons = [];
 
     const modeGroup = document.createElement("div");
     modeGroup.className = "mode-buttons";
     modeGroup.append(btnSeen, btnWatch);
 
+    let searchInput = inlineSearch;
+
     container.append(modeGroup, btnSearch, btnHelp, menu);
     document.body.appendChild(container);
 
     let isOpen = false;
-    let shortcutsOpen = false;
     let activeMode = normalizeMode(opts.currentMode || opts.currentList || "films");
     let lastModeChosen = false;
-
-    const setSharedStatus = (message, state) => {
-      sharedStatus.textContent = message || "";
-      sharedSection.classList.toggle("is-loading", state === "loading");
-      sharedSection.classList.toggle("is-error", state === "error");
-    };
-
-    const toggleShortcuts = (force) => {
-      shortcutsOpen = typeof force === "boolean" ? force : !shortcutsOpen;
-      shortcutsToggle.setAttribute("aria-expanded", shortcutsOpen ? "true" : "false");
-      shortcutsWrap.style.maxHeight = shortcutsOpen ? `${shortcutsWrap.scrollHeight}px` : "0px";
-      shortcutsWrap.classList.toggle("is-open", shortcutsOpen);
-    };
 
     const focusables = () =>
       Array.from(menu.querySelectorAll("[data-focusable]:not([hidden])")).filter(
@@ -226,15 +170,7 @@
       );
 
     const updateQuestion = (mode) => {
-      questionTitle.textContent = MODE_TITLES[mode];
-      searchInput.placeholder = MODE_PLACEHOLDER[mode];
-    };
-
-    const updateSharedVisibility = (mode) => {
-      const isShared = mode === "shared";
-      sharedSection.hidden = !isShared;
-      menu.classList.toggle("is-shared-mode", isShared);
-      if (!isShared) setSharedStatus("", "");
+      if (searchInput) searchInput.placeholder = MODE_PLACEHOLDER[mode];
     };
 
     const applyMode = (mode, notify) => {
@@ -245,6 +181,11 @@
         const isActive = btn.dataset.mode === normalized;
         btn.classList.toggle("is-active", isActive);
         btn.setAttribute("aria-checked", isActive ? "true" : "false");
+        if (btn.classList.contains("help-mode-item--expand")) {
+          btn.setAttribute("aria-expanded", isActive ? "true" : "false");
+          const chev = btn.querySelector(".help-mode-item__chevron");
+          if (chev) chev.textContent = isActive ? "▾" : "▸";
+        }
       });
       [btnSeen, btnWatch].forEach((btn) => {
         const isActive = btn.dataset.mode === normalized;
@@ -253,14 +194,7 @@
       });
       menu.dataset.mode = normalized;
       updateQuestion(normalized);
-      updateSharedVisibility(normalized);
-      if (isOpen) {
-        if (normalized === "shared" && (!sharedInput.value || !sharedInput.value.trim())) {
-          sharedInput.focus();
-        } else {
-          searchInput.focus();
-        }
-      }
+      if (isOpen && searchInput) searchInput.focus();
       if (!notify) return;
       if (opts.onModeChange) opts.onModeChange(normalized);
       if (opts.onToggleList) {
@@ -276,16 +210,18 @@
     const positionMenu = () => {
       const anchorRect = btnHelp.getBoundingClientRect();
       // Force measurement in case layout not ready
-      const measuredWidth = menu.offsetWidth || 320;
+      const measuredWidth = menu.offsetWidth || 250;
       const measuredHeight = menu.offsetHeight || 240;
+      // Align right edge with buttons (they sit at right:16px); small vertical gap
+      const gapY = 6;
       let left = anchorRect.right - measuredWidth;
-      let top = anchorRect.bottom + 8;
+      let top = anchorRect.bottom + gapY;
       const margin = 8;
       if (left < margin) left = margin;
       const maxLeft = window.innerWidth - measuredWidth - margin;
       if (left > maxLeft) left = maxLeft;
       const maxTop = window.innerHeight - measuredHeight - margin;
-      if (top > maxTop) top = Math.max(margin, anchorRect.top - measuredHeight - 8);
+      if (top > maxTop) top = Math.max(margin, anchorRect.top - measuredHeight - gapY);
       menu.style.left = `${left}px`;
       menu.style.top = `${top}px`;
     };
@@ -322,8 +258,8 @@
       if (lastModeChosen) {
         searchInput.focus();
       } else {
-        const firstMode = modeButtons[0];
-        if (firstMode) firstMode.focus();
+        const firstMode = modeButtons[0] || matchItem;
+        if (firstMode && firstMode.focus) firstMode.focus();
       }
     };
 
@@ -375,7 +311,7 @@
 
       if ((key === "h" || key === "H") && !isTypingTarget(target)) {
         event.preventDefault();
-        toggleShortcuts();
+        toggleShortcutsModal();
         return;
       }
 
@@ -407,85 +343,77 @@
         return;
       }
       if (key === "Enter" && target instanceof HTMLElement) {
-        if (target.dataset.action === "random") {
-          event.preventDefault();
-          if (opts.onRandom) opts.onRandom();
-          return;
-        }
         if (target.dataset.action === "shortcuts") {
           event.preventDefault();
-          toggleShortcuts();
+          toggleShortcutsModal();
           return;
         }
       }
     };
 
-    // Wire mode buttons
-    modeButtons.forEach((btn) => {
-      btn.addEventListener("click", (event) => {
-        event.stopPropagation();
-        const mode = btn.dataset.mode || "seen";
-        applyMode(mode, true);
-      });
+    // Match watchlist item (expand/collapse)
+    const toggleMatchDetails = () => {
+      const willOpen = matchDetails.hidden;
+      matchDetails.hidden = !willOpen;
+      matchItem.setAttribute("aria-expanded", willOpen ? "true" : "false");
+      const chev = matchItem.querySelector(".help-menu__chevron");
+      if (chev) chev.textContent = willOpen ? "▾" : "▸";
+      applyMode("shared", true);
+    };
+
+    matchItem.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleMatchDetails();
     });
 
-    // Shared input submit
-    const submitShared = async () => {
-      const username = String(sharedInput.value || "").trim();
-      if (!username) {
-        setSharedStatus("Enter a username first.", "error");
-        return;
-      }
-      const valid = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(username);
-      if (!valid) {
-        setSharedStatus("Invalid username.", "error");
-        return;
-      }
-      if (window.localStorage) {
-        window.localStorage.setItem(STORAGE_KEY, username);
-      }
-      if (opts.onSharedWatchlistSubmit) {
-        try {
-          setSharedStatus("Loading…", "loading");
-          const result = await opts.onSharedWatchlistSubmit(username);
-          if (result && result.ok === false) {
-            setSharedStatus(result.error || "Failed to load.", "error");
-          } else if (result && Array.isArray(result.items) && result.items.length === 0) {
-            setSharedStatus("No shared films found.", "");
-          } else {
-            setSharedStatus("", "");
-          }
-        } catch (err) {
-          setSharedStatus(err && err.message ? err.message : "Failed to load.", "error");
-        }
-      } else {
-        setSharedStatus("Shared watchlist not connected.", "error");
+    // Shortcuts modal helpers
+    const modalClose = shortcutsModal.querySelector(".help-modal__close");
+    const handleModalKey = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeShortcutsModal();
       }
     };
 
-    sharedInput.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        submitShared();
+    const openShortcutsModal = () => {
+      shortcutsModal.hidden = false;
+      shortcutsModal.classList.add("is-open");
+      document.body.appendChild(shortcutsModal);
+      if (modalClose) modalClose.focus();
+      document.addEventListener("keydown", handleModalKey, true);
+    };
+
+    const closeShortcutsModal = () => {
+      shortcutsModal.hidden = true;
+      shortcutsModal.classList.remove("is-open");
+      document.removeEventListener("keydown", handleModalKey, true);
+      shortcutsItem.focus();
+    };
+
+    const toggleShortcutsModal = () => {
+      if (shortcutsModal.hidden) {
+        openShortcutsModal();
+      } else {
+        closeShortcutsModal();
+      }
+    };
+
+    if (modalClose) {
+      modalClose.addEventListener("click", (event) => {
+        event.stopPropagation();
+        closeShortcutsModal();
+      });
+    }
+
+    shortcutsModal.addEventListener("click", (event) => {
+      if (event.target === shortcutsModal) {
+        closeShortcutsModal();
       }
     });
 
-    // Load stored username
-    if (window.localStorage) {
-      const stored = window.localStorage.getItem(STORAGE_KEY);
-      if (stored) sharedInput.value = stored;
-    }
-
-    // Random
-    randomBtn.addEventListener("click", (event) => {
+    shortcutsItem.addEventListener("click", (event) => {
       event.stopPropagation();
-      if (opts.onRandom) opts.onRandom();
-    });
-
-    // Shortcuts toggle
-    shortcutsToggle.addEventListener("click", (event) => {
-      event.stopPropagation();
-      toggleShortcuts();
+      openShortcutsModal();
     });
 
     // Prevent menu closing when clicking inside
@@ -520,6 +448,9 @@
 
     const syncInlineToMenu = () => {
       if (!searchInput) return;
+      // If both refs point to the same element (current setup), dispatching a new
+      // "input" event would recurse forever. Only proxy when they differ.
+      if (searchInput === inlineSearch) return;
       searchInput.value = inlineSearch.value || "";
       searchInput.dispatchEvent(new Event("input", { bubbles: true }));
     };
@@ -566,7 +497,6 @@
     });
 
     applyMode(activeMode, false);
-    updateSharedVisibility(activeMode);
 
     return {
       button: container,
@@ -574,10 +504,10 @@
       input: searchInput,
       open: openMenu,
       close: closeMenu,
-      toggle: modesGroup,
+      toggle: modeGroup,
       modeState: { applyMode },
       isOpen: () => isOpen,
-      toggleCondensed: toggleShortcuts,
+      toggleCondensed: toggleShortcutsModal,
     };
   }
 
@@ -593,19 +523,19 @@
     const menu = toggle.closest(".help-menu");
     if (menu) {
       const title = menu.querySelector(".help-menu__title");
-      const search = menu.querySelector(".help-input--search");
       const shared = menu.querySelector(".help-menu__shared");
       if (title) title.textContent = MODE_TITLES[mode];
-      if (search) search.placeholder = MODE_PLACEHOLDER[mode];
       if (shared) shared.hidden = mode !== "shared";
     }
-    const bar = toggle.closest(".help-bar");
+    const bar = toggle.closest(".menu");
     if (bar) {
-      bar.querySelectorAll(".help-bar__btn[data-mode]").forEach((btn) => {
+      bar.querySelectorAll(".menu__btn[data-mode]").forEach((btn) => {
         const active = btn.dataset.mode === mode;
         btn.classList.toggle("is-active", active);
         btn.setAttribute("aria-pressed", active ? "true" : "false");
       });
+      const inline = bar.querySelector(".help-inline-search");
+      if (inline) inline.placeholder = MODE_PLACEHOLDER[mode];
     }
   }
 

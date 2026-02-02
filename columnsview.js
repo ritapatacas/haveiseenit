@@ -489,6 +489,7 @@ let lastSlotMachineEnd = 0;
 const SLOT_MACHINE_GRACE_MS = 500;
 
 function clearHighlight() {
+  if (isSlotMachineSpinning) return;
   columnsRoot.classList.remove("is-dim");
   columnEls.forEach((col) => {
     col.querySelectorAll(".column__item.is-active").forEach((el) => {

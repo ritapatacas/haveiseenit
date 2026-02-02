@@ -6,6 +6,8 @@ function normalizeId(value) {
 
 let watchlistInFlight = null;
 
+const WATCHLIST_API_URL = "https://haveiwatchit.fly.dev/api/watchlist";
+
 async function fetchExternalUris(username) {
   const id = normalizeId(username);
   if (!id) throw new Error("Username is required");
@@ -14,7 +16,7 @@ async function fetchExternalUris(username) {
     return watchlistInFlight.promise;
   }
   const promise = (async () => {
-    const res = await fetch(`/api/watchlist?user=${encodeURIComponent(id)}`, { cache: "no-store" });
+    const res = await fetch(`${WATCHLIST_API_URL}?user=${encodeURIComponent(id)}`, { cache: "no-store" });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }));
       throw new Error(err.error || `HTTP ${res.status}`);

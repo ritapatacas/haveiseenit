@@ -5,6 +5,37 @@ let clipsReady = false;
 let clipTicking = false;
 let currentSheet = window.AppData.DEFAULT_SHEET;
 
+function normalizeId(value) {
+  return String(value || "").trim().toLowerCase().replace(/^@+/, "");
+}
+
+let watchlistInFlight = null;
+
+async function fetchExternalUris(username) {
+  const id = normalizeId(username);
+  if (!id) throw new Error("Username is required");
+
+  if (watchlistInFlight && watchlistInFlight.id === id) {
+    return watchlistInFlight.promise;
+  }
+  const promise = (async () => {
+    const res = await fetch(`/api/watchlist?user=${encodeURIComponent(id)}`, { cache: "no-store" });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const uris = await res.json();
+    if (!Array.isArray(uris)) throw new Error("Invalid response: expected array of URIs");
+    return uris;
+  })();
+  watchlistInFlight = { id, promise };
+  try {
+    return await promise;
+  } finally {
+    if (watchlistInFlight && watchlistInFlight.id === id) watchlistInFlight = null;
+  }
+}
+
 function getEntryLimit() {
   const isSmall = window.matchMedia("(max-width: 768px)").matches;
   return isSmall ? 40 : null;
@@ -202,6 +233,49 @@ async function init() {
   const params = new URLSearchParams(window.location.search);
   currentSheet = params.get("l") === "w" ? "watchlist" : "films";
 
+  async function loadEntries() {
+    const csvText = await fetch(window.AppData.getCsvUrl(currentSheet)).then((res) => res.text());
+    cachedEntries = window.AppData.parseCsv(csvText)
+      .filter((row) => row.name && row.year)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    const limit = getEntryLimit();
+    if (limit) cachedEntries = cachedEntries.slice(0, limit);
+    renderEntries(cachedEntries, help.input?.value?.trim() ?? "");
+  }
+
+  async function loadIntersectFromId(rawId) {
+    const id = normalizeId(rawId);
+    if (!id) {
+      const nextParams = new URLSearchParams(window.location.search);
+      nextParams.delete("u");
+      window.history.replaceState({}, "", `?${nextParams.toString()}`);
+      await loadEntries();
+      return;
+    }
+
+    feed.innerHTML = `<div class="loading"><span>Loading watchlist for ${id}…</span></div>`;
+    try {
+      const externalUris = await fetchExternalUris(id);
+      if (!externalUris || !externalUris.length) {
+        throw new Error("Watchlist scrape returned empty list");
+      }
+      const rows = await window.AppData.fetchSheetWatchlistIntersection(externalUris);
+      const matches = rows
+        .filter((row) => row.name && row.year)
+        .sort((a, b) => b.date.localeCompare(a.date));
+      console.log("[watchlist] matches found:", matches.length, matches.map((r) => ({ name: r.name, year: r.year, uri: r.filmUri || r.letterboxdUri })));
+      cachedEntries = matches;
+
+      const nextParams = new URLSearchParams(window.location.search);
+      nextParams.set("u", id);
+      window.history.replaceState({}, "", `?${nextParams.toString()}`);
+
+      renderEntries(cachedEntries, help.input?.value?.trim() ?? "");
+    } catch (err) {
+      feed.innerHTML = `<div class="loading"><span>Falhou a watchlist de ${id}: ${err.message}</span></div>`;
+    }
+  }
+
   const help = window.HelpUI.createHelpUI({
     currentList: currentSheet,
     onToggleView: () => {
@@ -222,6 +296,7 @@ async function init() {
       window.HelpUI.setListToggle(help.toggle, currentSheet);
       await loadEntries();
     },
+    onUsersSubmit: loadIntersectFromId,
   });
   window.HelpUI.setListToggle(help.toggle, currentSheet);
   window.HelpUI.setupCommonHotkeys(help, {
@@ -233,18 +308,16 @@ async function init() {
     onRandom: randomFilm,
     randomKey: "Space",
   });
-  async function loadEntries() {
-    const csvText = await fetch(window.AppData.getCsvUrl(currentSheet)).then((res) => res.text());
-    cachedEntries = window.AppData.parseCsv(csvText)
-      .filter((row) => row.name && row.year)
-      .sort((a, b) => b.date.localeCompare(a.date));
-    const limit = getEntryLimit();
-    if (limit) cachedEntries = cachedEntries.slice(0, limit);
-    renderEntries(cachedEntries, help.input?.value?.trim() ?? "");
-  }
 
   setupSearch(help.input);
+
   await loadEntries();
+
+  const userFromUrl = params.get("u");
+  if (userFromUrl) {
+    if (help.idInput) help.idInput.value = userFromUrl;
+    await loadIntersectFromId(userFromUrl);
+  }
 }
 
 init();

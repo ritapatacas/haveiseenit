@@ -1,5 +1,36 @@
 const columnsRoot = document.getElementById("columns");
 
+function normalizeId(value) {
+  return String(value || "").trim().toLowerCase().replace(/^@+/, "");
+}
+
+let watchlistInFlight = null;
+
+async function fetchExternalUris(username) {
+  const id = normalizeId(username);
+  if (!id) throw new Error("Username is required");
+
+  if (watchlistInFlight && watchlistInFlight.id === id) {
+    return watchlistInFlight.promise;
+  }
+  const promise = (async () => {
+    const res = await fetch(`/api/watchlist?user=${encodeURIComponent(id)}`, { cache: "no-store" });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    const uris = await res.json();
+    if (!Array.isArray(uris)) throw new Error("Invalid response: expected array of URIs");
+    return uris;
+  })();
+  watchlistInFlight = { id, promise };
+  try {
+    return await promise;
+  } finally {
+    if (watchlistInFlight && watchlistInFlight.id === id) watchlistInFlight = null;
+  }
+}
+
 function getColumnCount() {
   const w = window.innerWidth;
   if (w <= 520) return 2;
@@ -101,6 +132,7 @@ function setupWheelScroll(column) {
     "wheel",
     (event) => {
       event.preventDefault();
+      clearHighlight();
       column.scrollTop += event.deltaY;
     },
     { passive: false }
@@ -121,6 +153,7 @@ function setupLinkedScroll(columns) {
       lastScrollTop.set(column, current);
 
       if (isProgrammaticFocus) return;
+      if (!syncing && delta !== 0) clearHighlight();
       if (syncing || delta === 0) return;
 
       syncing = true;
@@ -160,8 +193,6 @@ function renderColumns(
       : (index + offset) % count;
     columns[colIndex].push(entry);
   });
-  columnData = columns;
-
   columnEls = [];
   columns.forEach((items, index) => {
     const column = document.createElement("div");
@@ -234,6 +265,31 @@ function getCenteredTargetTop(column, items) {
   return bestTargetTop;
 }
 
+function focusInCenter(focusKey) {
+  if (!focusKey || !columnEls.length) return;
+  const centerIndex = Math.floor(columnEls.length / 2);
+  const column = columnEls[centerIndex];
+  if (!column) return;
+
+  const items = Array.from(column.querySelectorAll(".column__item"));
+  if (!items.length) return;
+
+  const matches = items.filter(
+    (item) => (item.dataset.key || "").toLowerCase() === focusKey
+  );
+  if (!matches.length) return;
+
+  const bestTargetTop = getCenteredTargetTop(column, matches);
+  if (bestTargetTop === null) return;
+  const maxTop = Math.max(0, column.scrollHeight - column.clientHeight);
+  const clampedTop = Math.min(Math.max(0, bestTargetTop), maxTop);
+  isProgrammaticFocus = true;
+  column.scrollTo({ top: clampedTop, behavior: "smooth" });
+  window.setTimeout(() => {
+    isProgrammaticFocus = false;
+  }, 1500);
+}
+
 function focusMatchesInColumns(focusKeys, focusKey, token, retriesLeft = 0) {
   if (!focusKeys || !focusKeys.size || !columnEls.length) return;
   const centerIndex = Math.floor(columnEls.length / 2);
@@ -283,27 +339,6 @@ function focusMatchesInColumns(focusKeys, focusKey, token, retriesLeft = 0) {
   window.setTimeout(() => {
     isProgrammaticFocus = false;
   }, 120);
-}
-
-function focusInCenter(focusKey) {
-  if (!focusKey || !columnEls.length) return;
-  const centerIndex = Math.floor(columnEls.length / 2);
-  const column = columnEls[centerIndex];
-  if (!column) return;
-
-  const items = Array.from(column.querySelectorAll(".column__item"));
-  if (!items.length) return;
-
-  const matches = items.filter(
-    (item) => (item.dataset.key || "").toLowerCase() === focusKey
-  );
-  if (!matches.length) return;
-
-  const bestTargetTop = getCenteredTargetTop(column, matches);
-  if (bestTargetTop === null) return;
-  const maxTop = Math.max(0, column.scrollHeight - column.clientHeight);
-  const clampedTop = Math.min(Math.max(0, bestTargetTop), maxTop);
-  column.scrollTo({ top: clampedTop, behavior: "smooth" });
 }
 
 function setupSearch(input) {
@@ -441,7 +476,6 @@ function buildMatchColumnMap(matchKeys, count, centerIndex) {
 
 let cachedEntries = [];
 let columnEls = [];
-let columnData = [];
 let columnOffset = 0;
 let currentSheet = window.AppData.DEFAULT_SHEET;
 let renderToken = 0;
@@ -484,42 +518,60 @@ function randomInCenterColumn() {
   const items = Array.from(column.querySelectorAll(".column__item"));
   if (!items.length) return;
   const target = items[Math.floor(Math.random() * items.length)];
-  target.scrollIntoView({ block: "center", behavior: "smooth" });
-  column.scrollTop += Math.round(column.clientHeight * 0.28);
-  highlightByKeys(new Set([(target.dataset.key || "").toLowerCase()]));
-}
-
-function triggerSlotSpin() {
-  if (!columnEls.length) return;
-
-  const states = columnEls.map((col, index) => {
-    const segmentHeight = Number(col.dataset.segmentHeight || 0);
-    const duration = 2000 + Math.random() * 3000;
-    const baseSpeed = 6 + Math.random() * 6;
-    const speed = baseSpeed * (1 + (columnEls.length - 1 - index) * 0.05);
-    return { col, duration, speed, start: performance.now(), segmentHeight };
-  });
-
-  function step(now) {
-    let active = false;
-    states.forEach((state) => {
-      const elapsed = now - state.start;
-      if (elapsed >= state.duration) return;
-      active = true;
-      const t = elapsed / state.duration;
-      const ease = (1 - t) * (1 - t);
-      const delta = state.speed * ease * 16;
-      state.col.scrollTop += delta;
-    });
-    if (active) requestAnimationFrame(step);
-  }
-
-  requestAnimationFrame(step);
+  const focusKey = (target.dataset.key || "").toLowerCase();
+  if (!focusKey) return;
+  focusInCenter(focusKey);
+  window.setTimeout(() => {
+    highlightByKeys(new Set([focusKey]));
+  }, 800);
 }
 
 async function init() {
   const params = new URLSearchParams(window.location.search);
   currentSheet = params.get("l") === "w" ? "watchlist" : "films";
+
+  async function loadEntries() {
+    const csvText = await fetch(window.AppData.getCsvUrl(currentSheet)).then((res) => res.text());
+    cachedEntries = window.AppData.parseCsv(csvText)
+      .filter((row) => row.name && row.year)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    const limit = getEntryLimit();
+    if (limit) cachedEntries = cachedEntries.slice(0, limit);
+    renderColumns(cachedEntries);
+  }
+
+  async function loadIntersectFromId(rawId) {
+    const id = normalizeId(rawId);
+    if (!id) {
+      const nextParams = new URLSearchParams(window.location.search);
+      nextParams.delete("u");
+      window.history.replaceState({}, "", `?${nextParams.toString()}`);
+      await loadEntries();
+      return;
+    }
+
+    columnsRoot.innerHTML = `<div class="loading">Loading watchlist for ${id}…</div>`;
+    try {
+      const externalUris = await fetchExternalUris(id);
+      if (!externalUris || !externalUris.length) {
+        throw new Error("Watchlist scrape returned empty list");
+      }
+      const rows = await window.AppData.fetchSheetWatchlistIntersection(externalUris);
+      const matches = rows
+        .filter((row) => row.name && row.year)
+        .sort((a, b) => b.date.localeCompare(a.date));
+      console.log("[watchlist] matches found:", matches.length, matches.map((r) => ({ name: r.name, year: r.year, uri: r.filmUri || r.letterboxdUri })));
+      cachedEntries = matches;
+
+      const nextParams = new URLSearchParams(window.location.search);
+      nextParams.set("u", id);
+      window.history.replaceState({}, "", `?${nextParams.toString()}`);
+
+      renderColumns(cachedEntries);
+    } catch (err) {
+      columnsRoot.innerHTML = `<div class="loading">Falhou a watchlist de ${id}: ${err.message}</div>`;
+    }
+  }
 
   const helpOptions = {
     currentList: currentSheet,
@@ -541,6 +593,7 @@ async function init() {
       window.HelpUI.setListToggle(help.toggle, currentSheet);
       await loadEntries();
     },
+    onUsersSubmit: loadIntersectFromId,
     onClose: null,
   };
   const help = window.HelpUI.createHelpUI(helpOptions);
@@ -563,26 +616,16 @@ async function init() {
     onRandom: randomInCenterColumn,
     randomKey: null,
   });
-  async function loadEntries() {
-    const csvText = await fetch(window.AppData.getCsvUrl(currentSheet)).then((res) => res.text());
-    cachedEntries = window.AppData.parseCsv(csvText)
-      .filter((row) => row.name && row.year)
-      .sort((a, b) => b.date.localeCompare(a.date));
-    const limit = getEntryLimit();
-    if (limit) cachedEntries = cachedEntries.slice(0, limit);
-    renderColumns(cachedEntries);
-  }
 
   setupSearch(help.input);
-  if (help.button) {
-    help.button.addEventListener("click", (event) => {
-      const target = event.target;
-      if (target instanceof HTMLElement && target.closest(".help-button__close")) {
-        clearHighlight();
-      }
-    });
-  }
+
   await loadEntries();
+
+  const userFromUrl = params.get("u");
+  if (userFromUrl) {
+    if (help.idInput) help.idInput.value = userFromUrl;
+    await loadIntersectFromId(userFromUrl);
+  }
 }
 
 let resizeTimer = null;

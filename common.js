@@ -1,8 +1,4 @@
 (() => {
-  const MODE_TITLES = {
-    seen: "have i seen it",
-    watchlist: "should i watch it"
-  };
   const MODE_PLACEHOLDER = {
     seen: "search movies you've seen",
     watchlist: "search your watchlist",
@@ -80,23 +76,31 @@
 
     const btnSeen = makeBtn("fa-regular fa-eye", "Seen");
     const btnWatch = makeBtn("fa-regular fa-eye-slash", "To watch");
+    const btnUsers = makeBtn("fa-solid fa-users", "Letterboxd ID");
     const btnSearch = makeBtn("fa-solid fa-magnifying-glass", "Search");
     const btnHelp = makeBtn("fa-solid fa-ellipsis-vertical", "Help and shortcuts");
     btnHelp.classList.add("menu__btn--help");
     btnSearch.classList.add("menu__btn--search");
+    btnUsers.classList.add("menu__btn--id");
     const inlineSearch = document.createElement("input");
     inlineSearch.type = "search";
     inlineSearch.className = "help-inline-search";
     inlineSearch.placeholder = MODE_PLACEHOLDER.seen;
     inlineSearch.setAttribute("aria-label", "Search");
     btnSearch.appendChild(inlineSearch);
+    const inlineId = document.createElement("input");
+    inlineId.type = "search";
+    inlineId.className = "help-inline-id";
+    inlineId.placeholder = "letterboxd id";
+    inlineId.setAttribute("aria-label", "Letterboxd ID");
+    btnUsers.appendChild(inlineId);
     btnSeen.dataset.mode = "seen";
     btnWatch.dataset.mode = "watchlist";
     [btnSeen, btnWatch].forEach((btn) => btn.setAttribute("aria-pressed", "false"));
     btnHelp.setAttribute("aria-haspopup", "menu");
     btnHelp.setAttribute("aria-expanded", "false");
 
-    const built = buildMenu(opts);
+    const built = buildMenu();
     const { menu, shortcutsItem, shortcutsDetails } = built;
 
     const modeGroup = document.createElement("div");
@@ -105,7 +109,7 @@
 
     let searchInput = inlineSearch;
 
-    container.append(modeGroup, btnSearch, btnHelp, menu);
+    container.append(modeGroup, btnUsers, btnSearch, btnHelp, menu);
     document.body.appendChild(container);
 
     let isOpen = false;
@@ -318,6 +322,8 @@
     });
 
     let searchExpanded = false;
+    // Will be assigned after ID input setup; placeholder to allow mutual collapse.
+    let collapseInlineId = () => {};
     const collapseInlineSearch = () => {
       searchExpanded = false;
       btnSearch.classList.remove("is-open");
@@ -326,6 +332,7 @@
     };
 
     const expandInlineSearch = () => {
+      collapseInlineId();
       searchExpanded = true;
       btnSearch.classList.add("is-open");
       btnSearch.setAttribute("aria-expanded", "true");
@@ -394,12 +401,65 @@
       }, 120);
     });
 
+    // Inline Letterboxd ID
+    let idExpanded = false;
+    collapseInlineId = () => {
+      idExpanded = false;
+      btnUsers.classList.remove("is-open");
+      btnUsers.setAttribute("aria-expanded", "false");
+      inlineId.blur();
+    };
+
+    const expandInlineId = () => {
+      collapseInlineSearch();
+      idExpanded = true;
+      btnUsers.classList.add("is-open");
+      btnUsers.setAttribute("aria-expanded", "true");
+      inlineId.focus();
+      inlineId.select();
+    };
+
+    btnUsers.addEventListener("click", (event) => {
+      if (event.target === inlineId) return;
+      event.preventDefault();
+      if (idExpanded) {
+        collapseInlineId();
+      } else {
+        expandInlineId();
+      }
+    });
+
+    inlineId.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        collapseInlineId();
+        return;
+      }
+      if (event.key === "Enter") {
+        event.preventDefault();
+        const username = (inlineId.value || "").trim();
+        if (opts.onUsersSubmit && typeof opts.onUsersSubmit === "function") {
+          opts.onUsersSubmit(username);
+        }
+        collapseInlineId();
+      }
+    });
+
+    inlineId.addEventListener("blur", () => {
+      window.setTimeout(() => {
+        if (!btnUsers.contains(document.activeElement)) {
+          collapseInlineId();
+        }
+      }, 120);
+    });
+
     applyMode(activeMode, false);
 
     return {
       button: container,
       panel: menu,
       input: searchInput,
+      idInput: inlineId,
       open: openMenu,
       close: closeMenu,
       toggle: modeGroup,
@@ -419,11 +479,6 @@
       btn.classList.toggle("is-active", isActive);
       btn.setAttribute("aria-checked", isActive ? "true" : "false");
     });
-    const menu = toggle.closest(".help-menu");
-    if (menu) {
-      const title = menu.querySelector(".help-menu__title");
-      if (title) title.textContent = MODE_TITLES[mode];
-    }
     const bar = toggle.closest(".menu");
     if (bar) {
       bar.querySelectorAll(".menu__btn[data-mode]").forEach((btn) => {

@@ -190,7 +190,7 @@ function renderEntries(entries, searchQuery = "") {
     const msg =
       currentSheet === "watchlist"
         ? `Should I watch <u>${q}</u>?\n\nmaybe, but it's not in your <a href="${letterboxdWatchlist}" target="_blank" rel="noopener noreferrer">watchlist</a>`
-        : `Have I seen <u>${q}</u>?</br>\nno. (<a href="${letterboxdSearch}" target="_blank" rel="noopener noreferrer">did I</a>?)`;
+        : `Have I seen <u>${q}</u>?\nno. (<a href="${letterboxdSearch}" target="_blank" rel="noopener noreferrer">did I</a>?)`;
     feed.innerHTML = `<div class="loading"><span>${msg.replace(/\n/g, "<br>")}</span></div>`;
     return;
   }

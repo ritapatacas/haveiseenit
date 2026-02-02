@@ -597,13 +597,18 @@ window.addEventListener("resize", () => {
 init();
 
 window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    clearHighlight();
+    return;
+  }
   if (event.code !== "Space") return;
   const target = event.target;
   const active = document.activeElement;
   const isTyping =
     (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) ||
     (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable));
-  if (isTyping) return;
+  const isInMenu = (el) => el && typeof el.closest === "function" && el.closest(".menu");
+  if (isTyping || isInMenu(target) || isInMenu(active)) return;
   event.preventDefault();
-  triggerSlotSpin();
+  randomInCenterColumn();
 });

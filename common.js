@@ -257,9 +257,8 @@
       }
 
       if (key === " " || key === "Spacebar") {
-        const typing = isTypingTarget(target) || isTypingTarget(document.activeElement);
         const shouldRandom =
-          !typing &&
+          !isTypingTarget(target) &&
           typeof opts.onRandom === "function" &&
           (!opts.randomKey || opts.randomKey === "Space");
         if (shouldRandom) {
@@ -491,8 +490,7 @@
       }
 
       const isSpace = key === " " || key === "Spacebar";
-      const typing = isTypingTarget(target) || isTypingTarget(document.activeElement);
-      if (!typing && typeof onRandom === "function" && isSpace) {
+      if (!isTypingTarget(target) && typeof onRandom === "function" && isSpace) {
         const allowed = !randomKey || randomKey === "Space";
         if (allowed) {
           event.preventDefault();

@@ -47,8 +47,8 @@ body {
 }
 
 .columns.is-dim .column__item {
-  opacity: 0.4;
-  filter: saturate(0.7) brightness(0.9);
+  opacity: 0.3;
+  filter: saturate(0.65) brightness(0.75);
 }
 
 .columns.is-dim .column__item.is-active {

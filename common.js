@@ -94,6 +94,19 @@
     inlineId.placeholder = "letterboxd id";
     inlineId.setAttribute("aria-label", "Letterboxd ID");
     btnUsers.appendChild(inlineId);
+
+    const matchUserWrap = document.createElement("span");
+    matchUserWrap.className = "menu__match-user-wrap";
+    matchUserWrap.hidden = true;
+    const matchUserName = document.createElement("span");
+    matchUserName.className = "menu__match-user-name";
+    const matchUserClose = document.createElement("button");
+    matchUserClose.type = "button";
+    matchUserClose.className = "menu__match-user-close";
+    matchUserClose.setAttribute("aria-label", "Exit match user");
+    matchUserClose.innerHTML = "<i class=\"fa-solid fa-xmark\" aria-hidden=\"true\"></i>";
+    matchUserWrap.append(matchUserName, matchUserClose);
+    btnUsers.appendChild(matchUserWrap);
     btnSeen.dataset.mode = "seen";
     btnWatch.dataset.mode = "watchlist";
     [btnSeen, btnWatch].forEach((btn) => btn.setAttribute("aria-pressed", "false"));
@@ -244,7 +257,7 @@
 
       if (key === "Tab" && !isTypingTarget(target)) {
         event.preventDefault();
-        cycleMode();
+        if (container.dataset.mode !== "match_user") cycleMode();
         return;
       }
 
@@ -420,13 +433,20 @@
     };
 
     btnUsers.addEventListener("click", (event) => {
-      if (event.target === inlineId) return;
+      if (event.target === inlineId || event.target === matchUserClose || matchUserClose.contains(event.target)) return;
+      if (container.dataset.mode === "match_user") return;
       event.preventDefault();
       if (idExpanded) {
         collapseInlineId();
       } else {
         expandInlineId();
       }
+    });
+
+    matchUserClose.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof opts.onMatchUserExit === "function") opts.onMatchUserExit();
     });
 
     inlineId.addEventListener("keydown", (event) => {
@@ -455,6 +475,25 @@
 
     applyMode(activeMode, false);
 
+    const setMatchUserMode = (active, username) => {
+      if (active && username) {
+        container.dataset.mode = "match_user";
+        modeGroup.hidden = true;
+        inlineId.hidden = true;
+        matchUserName.textContent = username;
+        matchUserWrap.hidden = false;
+        btnUsers.classList.remove("is-open");
+        idExpanded = false;
+      } else {
+        delete container.dataset.mode;
+        modeGroup.hidden = false;
+        inlineId.hidden = false;
+        matchUserWrap.hidden = true;
+      }
+    };
+
+    if (opts.matchUserMode && opts.matchUserUsername) setMatchUserMode(true, opts.matchUserUsername);
+
     return {
       button: container,
       panel: menu,
@@ -464,6 +503,7 @@
       close: closeMenu,
       toggle: modeGroup,
       modeState: { applyMode, getMode: () => activeMode },
+      setMatchUserMode,
       isOpen: () => isOpen,
       toggleCondensed: toggleShortcutsDetails,
       openSearch: openInlineSearch,
@@ -526,6 +566,7 @@
 
       if (key === "Tab" && !isTypingTarget(target)) {
         event.preventDefault();
+        if (help.button?.dataset?.mode === "match_user") return;
         if (help.modeState && typeof help.modeState.applyMode === "function") {
           const current =
             (help.modeState.getMode && help.modeState.getMode()) ||

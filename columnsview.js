@@ -546,6 +546,7 @@ async function init() {
       const nextParams = new URLSearchParams(window.location.search);
       nextParams.delete("u");
       window.history.replaceState({}, "", `?${nextParams.toString()}`);
+      if (helpRef && helpRef.setMatchUserMode) helpRef.setMatchUserMode(false);
       await loadEntries();
       return;
     }
@@ -566,6 +567,7 @@ async function init() {
       const nextParams = new URLSearchParams(window.location.search);
       nextParams.set("u", id);
       window.history.replaceState({}, "", `?${nextParams.toString()}`);
+      if (helpRef && helpRef.setMatchUserMode) helpRef.setMatchUserMode(true, id);
 
       renderColumns(cachedEntries);
     } catch (err) {
@@ -573,8 +575,19 @@ async function init() {
     }
   }
 
+  let helpRef = null;
+  const userFromUrl = params.get("u");
   const helpOptions = {
     currentList: currentSheet,
+    matchUserMode: !!userFromUrl,
+    matchUserUsername: userFromUrl || "",
+    onMatchUserExit: async () => {
+      const nextParams = new URLSearchParams(window.location.search);
+      nextParams.delete("u");
+      window.history.replaceState({}, "", `?${nextParams.toString()}`);
+      if (helpRef && helpRef.setMatchUserMode) helpRef.setMatchUserMode(false);
+      await loadEntries();
+    },
     onToggleView: () => {
       const nextParams = new URLSearchParams(window.location.search);
       nextParams.set("v", "full");
@@ -597,6 +610,7 @@ async function init() {
     onClose: null,
   };
   const help = window.HelpUI.createHelpUI(helpOptions);
+  helpRef = help;
   helpOptions.onClose = () => {
     if (help.input) {
       help.input.value = "";
@@ -621,7 +635,6 @@ async function init() {
 
   await loadEntries();
 
-  const userFromUrl = params.get("u");
   if (userFromUrl) {
     if (help.idInput) help.idInput.value = userFromUrl;
     await loadIntersectFromId(userFromUrl);

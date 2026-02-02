@@ -41,6 +41,10 @@
   gap: var(--mode-gap);
 }
 
+.mode-buttons[hidden] {
+  display: none !important;
+}
+
 .mode-buttons::before {
   content: "";
   position: absolute;
@@ -100,6 +104,12 @@
   width: 180px;
 }
 
+.menu[data-mode="match_user"] .menu__btn--id {
+  width: auto;
+  min-width: 80px;
+  max-width: 200px;
+}
+
 .menu__btn--search.is-open {
   width: 180px;
 }
@@ -136,6 +146,52 @@
 .menu__btn--id.is-open .help-inline-id {
   width: 100%;
   opacity: 1;
+}
+
+.help-inline-id[hidden] {
+  display: none !important;
+}
+
+.menu__match-user-wrap {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  max-width: 160px;
+  overflow: hidden;
+}
+
+.menu__match-user-wrap:not([hidden]) {
+  display: flex;
+}
+
+.menu__match-user-name {
+  font: 200 12px/1.2 "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--help-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu__match-user-close {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--help-muted);
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
+}
+
+.menu__match-user-close:hover {
+  color: var(--help-text);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .help-inline-id::placeholder {

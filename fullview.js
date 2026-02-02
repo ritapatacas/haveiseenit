@@ -249,6 +249,7 @@ async function init() {
       const nextParams = new URLSearchParams(window.location.search);
       nextParams.delete("u");
       window.history.replaceState({}, "", `?${nextParams.toString()}`);
+      if (helpRef && helpRef.setMatchUserMode) helpRef.setMatchUserMode(false);
       await loadEntries();
       return;
     }
@@ -269,6 +270,7 @@ async function init() {
       const nextParams = new URLSearchParams(window.location.search);
       nextParams.set("u", id);
       window.history.replaceState({}, "", `?${nextParams.toString()}`);
+      if (helpRef && helpRef.setMatchUserMode) helpRef.setMatchUserMode(true, id);
 
       renderEntries(cachedEntries, help.input?.value?.trim() ?? "");
     } catch (err) {
@@ -276,8 +278,19 @@ async function init() {
     }
   }
 
+  let helpRef = null;
+  const userFromUrl = params.get("u");
   const help = window.HelpUI.createHelpUI({
     currentList: currentSheet,
+    matchUserMode: !!userFromUrl,
+    matchUserUsername: userFromUrl || "",
+    onMatchUserExit: async () => {
+      const nextParams = new URLSearchParams(window.location.search);
+      nextParams.delete("u");
+      window.history.replaceState({}, "", `?${nextParams.toString()}`);
+      if (helpRef && helpRef.setMatchUserMode) helpRef.setMatchUserMode(false);
+      await loadEntries();
+    },
     onToggleView: () => {
       const nextParams = new URLSearchParams(window.location.search);
       nextParams.set("v", "col");
@@ -298,6 +311,7 @@ async function init() {
     },
     onUsersSubmit: loadIntersectFromId,
   });
+  helpRef = help;
   window.HelpUI.setListToggle(help.toggle, currentSheet);
   window.HelpUI.setupCommonHotkeys(help, {
     onToggleView: () => {
@@ -313,7 +327,6 @@ async function init() {
 
   await loadEntries();
 
-  const userFromUrl = params.get("u");
   if (userFromUrl) {
     if (help.idInput) help.idInput.value = userFromUrl;
     await loadIntersectFromId(userFromUrl);

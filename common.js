@@ -596,5 +596,20 @@
     });
   }
 
-  window.HelpUI = { createHelpUI, setupCommonHotkeys, setListToggle };
+  /**
+   * Builds query string for location.search. In watchlist mode (or=shouldiwatchit) puts it first and omits l.
+   * @param {URLSearchParams} params
+   * @returns {string}
+   */
+  function buildSearchString(params) {
+    const isWatchlist = params.get("or") === "shouldiwatchit" || params.get("l") === "w";
+    if (!isWatchlist) return params.toString();
+    const rest = new URLSearchParams(params);
+    rest.delete("or");
+    rest.delete("l");
+    const restStr = rest.toString();
+    return restStr ? `or=shouldiwatchit&${restStr}` : "or=shouldiwatchit";
+  }
+
+  window.HelpUI = { createHelpUI, setupCommonHotkeys, setListToggle, buildSearchString };
 })();

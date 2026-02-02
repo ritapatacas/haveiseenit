@@ -1,6 +1,15 @@
 (() => {
-  const view = new URLSearchParams(window.location.search).get("v");
-  const useColumns = view === "col";
+  const params = new URLSearchParams(window.location.search);
+  let inParam = params.get("in");
+  const vParam = params.get("v");
+  if (!inParam && (vParam === "col" || vParam === "full")) {
+    inParam = vParam === "col" ? "slot" : "full";
+    params.delete("v");
+    params.set("in", inParam);
+    const qs = params.toString();
+    if (qs) window.history.replaceState({}, "", `?${qs}`);
+  }
+  const useColumns = inParam === "slot" || (!inParam && vParam === "col");
 
   const feed = document.getElementById("feed");
   const columns = document.getElementById("columns");

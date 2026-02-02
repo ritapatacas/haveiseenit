@@ -231,7 +231,13 @@ function renderEntries(entries, searchQuery = "") {
 
 async function init() {
   const params = new URLSearchParams(window.location.search);
-  currentSheet = params.get("l") === "w" ? "watchlist" : "films";
+  currentSheet = (params.get("or") === "shouldiwatchit" || params.get("l") === "w") ? "watchlist" : "films";
+  if (currentSheet === "watchlist") {
+    const qs = window.HelpUI.buildSearchString(params);
+    if (window.location.search.slice(1) !== qs) {
+      window.history.replaceState({}, "", `?${qs}`);
+    }
+  }
 
   async function loadEntries() {
     const csvText = await fetch(window.AppData.getCsvUrl(currentSheet)).then((res) => res.text());
@@ -248,7 +254,7 @@ async function init() {
     if (!id) {
       const nextParams = new URLSearchParams(window.location.search);
       nextParams.delete("u");
-      window.history.replaceState({}, "", `?${nextParams.toString()}`);
+      window.history.replaceState({}, "", `?${window.HelpUI.buildSearchString(nextParams)}`);
       if (helpRef && helpRef.setMatchUserMode) helpRef.setMatchUserMode(false);
       await loadEntries();
       return;
@@ -269,7 +275,7 @@ async function init() {
 
       const nextParams = new URLSearchParams(window.location.search);
       nextParams.set("u", id);
-      window.history.replaceState({}, "", `?${nextParams.toString()}`);
+      window.history.replaceState({}, "", `?${window.HelpUI.buildSearchString(nextParams)}`);
       if (helpRef && helpRef.setMatchUserMode) helpRef.setMatchUserMode(true, id);
 
       renderEntries(cachedEntries, help.input?.value?.trim() ?? "");
@@ -287,25 +293,25 @@ async function init() {
     onMatchUserExit: async () => {
       const nextParams = new URLSearchParams(window.location.search);
       nextParams.delete("u");
-      window.history.replaceState({}, "", `?${nextParams.toString()}`);
+      window.history.replaceState({}, "", `?${window.HelpUI.buildSearchString(nextParams)}`);
       if (helpRef && helpRef.setMatchUserMode) helpRef.setMatchUserMode(false);
       await loadEntries();
     },
     onToggleView: () => {
       const nextParams = new URLSearchParams(window.location.search);
-      nextParams.set("v", "col");
-      window.location.search = nextParams.toString();
+      nextParams.set("in", "slot");
+      window.location.search = window.HelpUI.buildSearchString(nextParams);
     },
     onRandom: randomFilm,
     onToggleList: async (nextList) => {
       currentSheet = nextList;
       const nextParams = new URLSearchParams(window.location.search);
       if (currentSheet === "watchlist") {
-        nextParams.set("l", "w");
+        nextParams.set("or", "shouldiwatchit");
       } else {
-        nextParams.delete("l");
+        nextParams.delete("or");
       }
-      window.history.replaceState({}, "", `?${nextParams.toString()}`);
+      window.history.replaceState({}, "", `?${window.HelpUI.buildSearchString(nextParams)}`);
       window.HelpUI.setListToggle(help.toggle, currentSheet);
       await loadEntries();
     },
@@ -316,8 +322,8 @@ async function init() {
   window.HelpUI.setupCommonHotkeys(help, {
     onToggleView: () => {
       const nextParams = new URLSearchParams(window.location.search);
-      nextParams.set("v", "col");
-      window.location.search = nextParams.toString();
+      nextParams.set("in", "slot");
+      window.location.search = window.HelpUI.buildSearchString(nextParams);
     },
     onRandom: randomFilm,
     randomKey: "Space",

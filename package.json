@@ -1,0 +1,9 @@
+{
+  "name": "haveiwatchit",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server/server.js",
+    "test:smoke": "node tests/smoke.js"
+  }
+}

@@ -1,114 +1,15 @@
-const SHEET_ID = "1sP2Tkz00oTiVoACyCznYBOqTaUecUVbUKSQUWVsQDe4";
-const DEFAULT_SHEET = "films";
-
-function getCsvUrl(sheetName) {
-  return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(
-    sheetName
-  )}`;
-}
-
 const feed = document.getElementById("feed");
+const FULL_CONFIG = { mobileEntryLimit: 40 };
 let cachedEntries = [];
 let clipPosts = [];
 let clipsReady = false;
 let clipTicking = false;
-let currentSheet = DEFAULT_SHEET;
+let viewState = { currentSheet: window.AppData.DEFAULT_SHEET };
+let helpRef = null;
 
 function getEntryLimit() {
   const isSmall = window.matchMedia("(max-width: 768px)").matches;
-  return isSmall ? 40 : null;
-}
-
-function parseCsvLine(line) {
-  const out = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-
-    if (ch === "," && !inQuotes) {
-      out.push(current);
-      current = "";
-      continue;
-    }
-
-    current += ch;
-  }
-
-  out.push(current);
-  return out;
-}
-
-function parseCsv(text) {
-  const rows = [];
-  let row = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < text.length; i += 1) {
-    const ch = text[i];
-
-    if (ch === '"') {
-      if (inQuotes && text[i + 1] === '"') {
-        current += '"';
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-
-    if (ch === "," && !inQuotes) {
-      row.push(current);
-      current = "";
-      continue;
-    }
-
-    if ((ch === "\n" || ch === "\r") && !inQuotes) {
-      if (ch === "\r" && text[i + 1] === "\n") i += 1;
-      row.push(current);
-      rows.push(row);
-      row = [];
-      current = "";
-      continue;
-    }
-
-    current += ch;
-  }
-
-  if (current.length || row.length) {
-    row.push(current);
-    rows.push(row);
-  }
-
-  if (rows.length <= 1) return [];
-  rows.shift();
-
-  return rows
-    .filter((cols) => cols.length >= 4)
-    .map((cols) => ({
-      date: cols[0],
-      name: cols[1],
-      year: cols[2],
-      letterboxdUri: cols[3] || "",
-      filmUri: cols[4] || "",
-      image: cols[5] || "",
-      poster: cols[6] || "",
-      genre: cols[7] || "",
-      director: cols[8] || "",
-      rating: cols[9] || "",
-      review: cols[10] || "",
-    }));
+  return isSmall ? FULL_CONFIG.mobileEntryLimit : null;
 }
 
 function ratingToStars(rating) {
@@ -236,24 +137,15 @@ function setupSearch(input) {
   input.addEventListener("input", () => {
     const query = input.value.trim().toLowerCase();
     if (!query) {
-      renderEntries(cachedEntries);
+      renderEntries(cachedEntries, "", viewState.currentSheet);
       return;
-    }
-
-    function scoreText(text, q) {
-      if (!text) return 0;
-      const t = text.toLowerCase();
-      if (t === q) return 100;
-      if (t.startsWith(q)) return 80;
-      if (new RegExp(`\\b${q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(t)) return 70;
-      if (t.includes(q)) return 50;
-      return 0;
     }
 
     const scored = cachedEntries
       .map((entry) => {
-        const nameScore = scoreText(entry.name, query);
-        const directorScore = scoreText(entry.director || "", query) * 0.8;
+        const nameScore = window.AppCommon.scoreSearchText(entry.name, query);
+        const directorScore =
+          window.AppCommon.scoreSearchText(entry.director || "", query) * 0.8;
         const score = Math.max(nameScore, directorScore);
         return { entry, score };
       })
@@ -261,11 +153,11 @@ function setupSearch(input) {
       .sort((a, b) => b.score - a.score || b.entry.date.localeCompare(a.entry.date))
       .map((item) => item.entry);
 
-    renderEntries(scored);
+    renderEntries(scored, query, viewState.currentSheet);
   });
 }
 
-function renderEntries(entries) {
+function renderEntries(entries, searchQuery = "", sheet = window.AppData.DEFAULT_SHEET) {
   feed.innerHTML = "";
   const usePoster = window.matchMedia("(orientation: portrait)").matches;
 
@@ -285,60 +177,40 @@ function renderEntries(entries) {
   });
 
   if (!feed.children.length) {
-    feed.innerHTML = "<div class=\"loading\">No backdrops found.</div>";
+    const q = (searchQuery || "it").trim() || "it";
+    const letterboxdWatchlist = "https://letterboxd.com/ritsaptcs/watchlist/";
+    const letterboxdSearch = `https://letterboxd.com/search/${encodeURIComponent(q)}`;
+    const msg =
+      sheet === "watchlist"
+        ? `Should I watch <u>${q}</u>?\n\nmaybe, but it's not in your <a href="${letterboxdWatchlist}" target="_blank" rel="noopener noreferrer">watchlist</a>`
+        : `Have I seen <u>${q}</u>?\nno. (<a href="${letterboxdSearch}" target="_blank" rel="noopener noreferrer">did I</a>?)`;
+    feed.innerHTML = `<div class="loading"><span>${msg.replace(/\n/g, "<br>")}</span></div>`;
     return;
   }
 
   initClips();
 }
 
-async function init() {
-  const params = new URLSearchParams(window.location.search);
-  currentSheet = params.get("l") === "w" ? "watchlist" : "films";
-
-  const help = window.HelpUI.createHelpUI({
-    currentList: currentSheet,
-    onToggleView: () => {
-      const nextParams = new URLSearchParams(window.location.search);
-      nextParams.set("v", "col");
-      window.location.search = nextParams.toString();
-    },
-    onRandom: randomFilm,
-    onToggleList: async (nextList) => {
-      currentSheet = nextList;
-      const nextParams = new URLSearchParams(window.location.search);
-      if (currentSheet === "watchlist") {
-        nextParams.set("l", "w");
-      } else {
-        nextParams.delete("l");
-      }
-      window.history.replaceState({}, "", `?${nextParams.toString()}`);
-      window.HelpUI.setListToggle(help.toggle, currentSheet);
-      await loadEntries();
-    },
-  });
-  window.HelpUI.setListToggle(help.toggle, currentSheet);
-  window.HelpUI.setupCommonHotkeys(help, {
-    onToggleView: () => {
-      const nextParams = new URLSearchParams(window.location.search);
-      nextParams.set("v", "col");
-      window.location.search = nextParams.toString();
-    },
-    onRandom: randomFilm,
-    randomKey: "Space",
-  });
-  async function loadEntries() {
-    const csvText = await fetch(getCsvUrl(currentSheet)).then((res) => res.text());
-    cachedEntries = parseCsv(csvText)
-      .filter((row) => row.name && row.year)
-      .sort((a, b) => b.date.localeCompare(a.date));
-    const limit = getEntryLimit();
-    if (limit) cachedEntries = cachedEntries.slice(0, limit);
-    renderEntries(cachedEntries);
-  }
-
-  setupSearch(help.input);
-  await loadEntries();
-}
-
-init();
+window.AppCommon.initView({
+  container: feed,
+  getEntryLimit,
+  renderEntries: (entries, meta = {}) => {
+    cachedEntries = entries;
+    viewState.currentSheet = meta.currentSheet || viewState.currentSheet;
+    const searchValue = helpRef?.input?.value?.trim() ?? "";
+    renderEntries(entries, searchValue, viewState.currentSheet);
+  },
+  toggleViewParam: "slot",
+  onRandom: randomFilm,
+  randomKey: "Space",
+  renderLoading: (message) => {
+    feed.innerHTML = `<div class=\"loading\"><span>${message}</span></div>`;
+  },
+  renderError: (message) => {
+    feed.innerHTML = `<div class=\"loading\"><span>${message}</span></div>`;
+  },
+  onHelpCreated: (help) => {
+    helpRef = help;
+    setupSearch(help.input);
+  },
+});

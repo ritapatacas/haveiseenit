@@ -8,3 +8,4 @@ app-script/*
 .env
 
 tmp
+.DS_Store

@@ -17,9 +17,13 @@ body { color: rgba(255,255,255,.8); }
   background-size: cover;
 
   clip-path: inset(100vh 0 0 0);
-  will-change: clip-path;
   pointer-events: none;
   transform: translateZ(0);
+}
+
+/* Only the visible post gets will-change to limit GPU layers on mobile */
+.post__fixed--active {
+  will-change: clip-path;
 }
 
 .post__ui {
@@ -41,6 +45,13 @@ body { color: rgba(255,255,255,.8); }
   border-radius: 14px;
   padding: 14px 16px;
 }
+
+@media (max-width: 768px) {
+  .card {
+    margin-bottom: 62px;
+  }
+}
+
 .card h2 { margin: 0 0 6px; font-size: 14px; line-height: 1.15; font-weight: 300; }
 .card p { margin: 0; opacity: .92; font-size: 12px; font-style: italic; }
 .card a {

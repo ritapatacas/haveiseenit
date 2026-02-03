@@ -108,6 +108,8 @@ body {
   gap: 8px;
   padding: 0 10px;
   width: 40px;
+  min-width: 40px;
+  flex: 0 0 auto;
   overflow: hidden;
   background: rgba(18, 19, 22, 0.76);
   border: 1px solid var(--help-border);
@@ -151,6 +153,7 @@ body {
 
 .menu__btn--search.is-open {
   width: 180px;
+  min-width: 180px;
 }
 
 .help-inline-search {
@@ -580,6 +583,12 @@ body {
   width: 100%;
   box-sizing: border-box;
   word-break: break-word;
+}
+
+@media (max-width: 768px) {
+  .help-menu__shortcuts {
+    display: none !important;
+  }
 }
 
 .help-modal[hidden] {

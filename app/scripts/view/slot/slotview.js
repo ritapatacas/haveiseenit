@@ -37,11 +37,22 @@ function createItem(entry) {
   link.target = "_blank";
   link.rel = "noopener noreferrer";
 
+  const rawUrl = getEntryImage(entry);
   const img = document.createElement("img");
   img.loading = "lazy";
   img.decoding = "async";
-  img.src = getEntryImage(entry);
   img.alt = `${entry.name} (${entry.year})`;
+
+  const tmdb = window.AppTmdbImages;
+  if (tmdb && tmdb.isTmdbImageUrl(rawUrl)) {
+    img.src = tmdb.getTmdbUrlForSize(rawUrl, "w185");
+    const srcset = tmdb.getTmdbSrcset(rawUrl, [154, 342]);
+    if (srcset) img.srcset = srcset;
+    if (tmdb.getTmdbSizesList) img.sizes = tmdb.getTmdbSizesList();
+  } else {
+    img.src = rawUrl;
+  }
+
   link.appendChild(img);
   return link;
 }
@@ -582,7 +593,8 @@ window.AppCommon.initView({
   getEntryLimit,
   renderEntries: (entries) => {
     cachedEntries = entries;
-    renderSlot(entries);
+    const limit = getEntryLimit();
+    renderSlot(limit ? entries.slice(0, limit) : entries);
   },
   toggleViewParam: "full",
   onRandom: randomInCenterColumn,

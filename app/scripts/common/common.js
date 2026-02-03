@@ -112,11 +112,9 @@
 
     const loadEntries = async () => {
       const csvText = await fetch(window.AppData.getCsvUrl(state.currentSheet)).then((res) => res.text());
-      let entries = window.AppData.parseCsv(csvText)
+      const entries = window.AppData.parseCsv(csvText)
         .filter((row) => row.name && row.year)
         .sort((a, b) => b.date.localeCompare(a.date));
-      const limit = typeof getEntryLimit === "function" ? getEntryLimit() : null;
-      if (limit) entries = entries.slice(0, limit);
       state.cachedEntries = entries;
       if (typeof renderEntries === "function") renderEntries(entries, { source: "sheet", currentSheet: state.currentSheet });
       return entries;
@@ -245,7 +243,7 @@
 
     const shortcutsItem = document.createElement("button");
     shortcutsItem.type = "button";
-    shortcutsItem.className = "help-menu__item";
+    shortcutsItem.className = "help-menu__item help-menu__shortcuts";
     shortcutsItem.dataset.action = "shortcuts";
     shortcutsItem.setAttribute("role", "menuitem");
     shortcutsItem.setAttribute("data-focusable", "true");
@@ -254,7 +252,7 @@
       '<span class="help-menu__label">Shortcuts</span><span class="help-menu__icon" aria-hidden="true">⌘</span>';
 
     const shortcutsDetails = document.createElement("div");
-    shortcutsDetails.className = "help-menu__details";
+    shortcutsDetails.className = "help-menu__details help-menu__shortcuts";
     const shortcutsList = document.createElement("div");
     shortcutsList.className = "menu__shortcuts-list";
     [
@@ -421,6 +419,8 @@
       tipsItem.setAttribute("aria-expanded", "false");
       shortcutsDetails.hidden = true;
       shortcutsItem.setAttribute("aria-expanded", "false");
+      collapseInlineSearch();
+      collapseInlineId();
       document.removeEventListener("mousedown", handleDocumentMouseDown, true);
       document.removeEventListener("keydown", handleKeyDown, true);
       window.removeEventListener("resize", positionMenu);
@@ -432,6 +432,10 @@
     const openMenu = () => {
       if (isOpen) return;
       isOpen = true;
+      // Reset inline inputs to avoid auto-focus/keyboard pop-up on mobile
+      collapseInlineSearch();
+      collapseInlineId();
+
       btnHelp.setAttribute("aria-expanded", "true");
       menu.style.display = "block";
       menu.classList.add("is-open");
@@ -447,9 +451,8 @@
       window.addEventListener("resize", positionMenu);
       window.addEventListener("scroll", positionMenu, true);
 
-      if (lastModeChosen) {
-        searchInput.focus();
-      } else {
+      // Avoid focusing inputs on open (prevents mobile keyboard); focus a menu item instead
+      if (shortcutsItem && shortcutsItem.focus) {
         shortcutsItem.focus();
       }
     };

@@ -1,14 +1,4 @@
-* { box-sizing: border-box; }
-html, body { height: 100%; }
-body {
-  margin: 0;
-  background: #000;
-  color: rgba(255,255,255,.8);
-  font: 300 14px/1.45 "Red Hat Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  overflow-x: hidden;
-}
-
-
+body { color: rgba(255,255,255,.8); }
 .feed { scroll-snap-type: y mandatory; }
 
 .post {
@@ -73,24 +63,6 @@ body {
   letter-spacing: 0;
   padding-top: 2px;
   transform: translateY(1px) scaleX(0.9);
-}
-
-.loading {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: rgba(255,255,255,.7);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  font-size: 12px;
-  pointer-events: none;
-}
-
-.loading a {
-  pointer-events: auto;
-  color: inherit;
-  text-decoration: underline;
 }
 
 .card h2 strong { font-weight: 700; }

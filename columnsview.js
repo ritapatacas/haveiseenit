@@ -1,38 +1,5 @@
 const columnsRoot = document.getElementById("columns");
 
-function normalizeId(value) {
-  return String(value || "").trim().toLowerCase().replace(/^@+/, "");
-}
-
-let watchlistInFlight = null;
-
-const WATCHLIST_API_URL = "https://haveiwatchit.fly.dev/api/watchlist";
-
-async function fetchExternalUris(username) {
-  const id = normalizeId(username);
-  if (!id) throw new Error("Username is required");
-
-  if (watchlistInFlight && watchlistInFlight.id === id) {
-    return watchlistInFlight.promise;
-  }
-  const promise = (async () => {
-    const res = await fetch(`${WATCHLIST_API_URL}?user=${encodeURIComponent(id)}`, { cache: "no-store" });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(err.error || `HTTP ${res.status}`);
-    }
-    const uris = await res.json();
-    if (!Array.isArray(uris)) throw new Error("Invalid response: expected array of URIs");
-    return uris;
-  })();
-  watchlistInFlight = { id, promise };
-  try {
-    return await promise;
-  } finally {
-    if (watchlistInFlight && watchlistInFlight.id === id) watchlistInFlight = null;
-  }
-}
-
 function getColumnCount() {
   const w = window.innerWidth;
   if (w <= 520) return 2;
@@ -355,22 +322,12 @@ function setupSearch(input) {
       return;
     }
 
-    function scoreText(text, q) {
-      if (!text) return 0;
-      const t = text.toLowerCase();
-      if (t === q) return 100;
-      if (t.startsWith(q)) return 80;
-      const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      if (new RegExp(`\\b${escaped}`).test(t)) return 70;
-      if (t.includes(q)) return 50;
-      return 0;
-    }
-
     const withImages = cachedEntries.filter((entry) => getEntryImage(entry));
     const scored = withImages
       .map((entry) => {
-        const nameScore = scoreText(entry.name, query);
-        const directorScore = scoreText(entry.director || "", query) * 0.8;
+        const nameScore = window.AppCommon.scoreSearchText(entry.name, query);
+        const directorScore =
+          window.AppCommon.scoreSearchText(entry.director || "", query) * 0.8;
         const score = Math.max(nameScore, directorScore);
         return { entry, score };
       })
@@ -481,7 +438,6 @@ function buildMatchColumnMap(matchKeys, count, centerIndex) {
 let cachedEntries = [];
 let columnEls = [];
 let columnOffset = 0;
-let currentSheet = window.AppData.DEFAULT_SHEET;
 let renderToken = 0;
 let isProgrammaticFocus = false;
 let isSlotMachineSpinning = false;
@@ -608,127 +564,6 @@ function randomInCenterColumn() {
   requestAnimationFrame(tick);
 }
 
-async function init() {
-  const params = new URLSearchParams(window.location.search);
-  currentSheet = (params.get("or") === "shouldiwatchit" || params.get("l") === "w") ? "watchlist" : "films";
-  if (currentSheet === "watchlist") {
-    const qs = window.HelpUI.buildSearchString(params);
-    if (window.location.search.slice(1) !== qs) {
-      window.history.replaceState({}, "", `?${qs}`);
-    }
-  }
-
-  async function loadEntries() {
-    const csvText = await fetch(window.AppData.getCsvUrl(currentSheet)).then((res) => res.text());
-    cachedEntries = window.AppData.parseCsv(csvText)
-      .filter((row) => row.name && row.year)
-      .sort((a, b) => b.date.localeCompare(a.date));
-    const limit = getEntryLimit();
-    if (limit) cachedEntries = cachedEntries.slice(0, limit);
-    renderColumns(cachedEntries);
-  }
-
-  async function loadIntersectFromId(rawId) {
-    const id = normalizeId(rawId);
-    if (!id) {
-      const nextParams = new URLSearchParams(window.location.search);
-      nextParams.delete("u");
-      window.history.replaceState({}, "", `?${window.HelpUI.buildSearchString(nextParams)}`);
-      if (helpRef && helpRef.setMatchUserMode) helpRef.setMatchUserMode(false);
-      await loadEntries();
-      return;
-    }
-
-    columnsRoot.innerHTML = `<div class="loading">Loading watchlist for ${id}…</div>`;
-    try {
-      const externalUris = await fetchExternalUris(id);
-      if (!externalUris || !externalUris.length) {
-        throw new Error("Watchlist scrape returned empty list");
-      }
-      const rows = await window.AppData.fetchSheetWatchlistIntersection(externalUris);
-      const matches = rows
-        .filter((row) => row.name && row.year)
-        .sort((a, b) => b.date.localeCompare(a.date));
-      console.log("[watchlist] matches found:", matches.length, matches.map((r) => ({ name: r.name, year: r.year, uri: r.filmUri || r.letterboxdUri })));
-      cachedEntries = matches;
-
-      const nextParams = new URLSearchParams(window.location.search);
-      nextParams.set("u", id);
-      window.history.replaceState({}, "", `?${window.HelpUI.buildSearchString(nextParams)}`);
-      if (helpRef && helpRef.setMatchUserMode) helpRef.setMatchUserMode(true, id);
-
-      renderColumns(cachedEntries);
-    } catch (err) {
-      columnsRoot.innerHTML = `<div class="loading">Falhou a watchlist de ${id}: ${err.message}</div>`;
-    }
-  }
-
-  let helpRef = null;
-  const userFromUrl = params.get("u");
-  const helpOptions = {
-    currentList: currentSheet,
-    matchUserMode: !!userFromUrl,
-    matchUserUsername: userFromUrl || "",
-    onMatchUserExit: async () => {
-      const nextParams = new URLSearchParams(window.location.search);
-      nextParams.delete("u");
-      window.history.replaceState({}, "", `?${window.HelpUI.buildSearchString(nextParams)}`);
-      if (helpRef && helpRef.setMatchUserMode) helpRef.setMatchUserMode(false);
-      await loadEntries();
-    },
-    onToggleView: () => {
-      const nextParams = new URLSearchParams(window.location.search);
-      nextParams.set("in", "full");
-      window.location.search = window.HelpUI.buildSearchString(nextParams);
-    },
-    onRandom: randomInCenterColumn,
-    onToggleList: async (nextList) => {
-      currentSheet = nextList;
-      const nextParams = new URLSearchParams(window.location.search);
-      if (currentSheet === "watchlist") {
-        nextParams.set("or", "shouldiwatchit");
-      } else {
-        nextParams.delete("or");
-      }
-      window.history.replaceState({}, "", `?${window.HelpUI.buildSearchString(nextParams)}`);
-      window.HelpUI.setListToggle(help.toggle, currentSheet);
-      await loadEntries();
-    },
-    onUsersSubmit: loadIntersectFromId,
-    onClose: null,
-  };
-  const help = window.HelpUI.createHelpUI(helpOptions);
-  helpRef = help;
-  helpOptions.onClose = () => {
-    if (help.input) {
-      help.input.value = "";
-      help.input.dispatchEvent(new Event("input", { bubbles: true }));
-    } else {
-      renderColumns(cachedEntries, 0, null, "", null);
-      clearHighlight();
-    }
-  };
-  window.HelpUI.setListToggle(help.toggle, currentSheet);
-  window.HelpUI.setupCommonHotkeys(help, {
-    onToggleView: () => {
-      const nextParams = new URLSearchParams(window.location.search);
-      nextParams.set("in", "full");
-      window.location.search = window.HelpUI.buildSearchString(nextParams);
-    },
-    onRandom: randomInCenterColumn,
-    randomKey: null,
-  });
-
-  setupSearch(help.input);
-
-  await loadEntries();
-
-  if (userFromUrl) {
-    if (help.idInput) help.idInput.value = userFromUrl;
-    await loadIntersectFromId(userFromUrl);
-  }
-}
-
 let resizeTimer = null;
 window.addEventListener("resize", () => {
   if (!cachedEntries.length) return;
@@ -737,8 +572,32 @@ window.addEventListener("resize", () => {
     renderColumns(cachedEntries);
   }, 200);
 });
-
-init();
+window.AppCommon.initView({
+  container: columnsRoot,
+  getEntryLimit,
+  renderEntries: (entries) => {
+    cachedEntries = entries;
+    renderColumns(entries);
+  },
+  toggleViewParam: "full",
+  onRandom: randomInCenterColumn,
+  randomKey: null,
+  renderLoading: (message) => {
+    columnsRoot.innerHTML = `<div class="loading">${message}</div>`;
+  },
+  renderError: (message) => {
+    columnsRoot.innerHTML = `<div class="loading">${message}</div>`;
+  },
+  onHelpCreated: (help) => {
+    setupSearch(help.input);
+  },
+  onHelpClose: () => {
+    if (cachedEntries.length) {
+      renderColumns(cachedEntries, 0, null, "", null);
+      clearHighlight();
+    }
+  },
+});
 
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {

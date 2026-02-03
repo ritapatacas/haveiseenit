@@ -4,6 +4,9 @@
     watchlist: "search your watchlist",
   };
 
+  const WATCHLIST_API_URL = "https://haveiwatchit.fly.dev/api/watchlist";
+  let watchlistInFlight = null;
+
   const isTypingTarget = (el) =>
     el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
 
@@ -11,6 +14,200 @@
     if (value === "watchlist") return "watchlist";
     return "seen";
   };
+
+  function normalizeId(value) {
+    return String(value || "").trim().toLowerCase().replace(/^@+/, "");
+  }
+
+  async function fetchExternalUris(username) {
+    const id = normalizeId(username);
+    if (!id) throw new Error("Username is required");
+
+    if (watchlistInFlight && watchlistInFlight.id === id) {
+      return watchlistInFlight.promise;
+    }
+    const promise = (async () => {
+      const res = await fetch(`${WATCHLIST_API_URL}?user=${encodeURIComponent(id)}`, { cache: "no-store" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const uris = await res.json();
+      if (!Array.isArray(uris)) throw new Error("Invalid response: expected array of URIs");
+      return uris;
+    })();
+    watchlistInFlight = { id, promise };
+    try {
+      return await promise;
+    } finally {
+      if (watchlistInFlight && watchlistInFlight.id === id) watchlistInFlight = null;
+    }
+  }
+
+  function scoreSearchText(text, query) {
+    if (!text) return 0;
+    const q = (query || "").trim().toLowerCase();
+    if (!q) return 0;
+    const t = text.toLowerCase();
+    if (t === q) return 100;
+    if (t.startsWith(q)) return 80;
+    const escaped = q.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&");
+    if (new RegExp(`\\b${escaped}`).test(t)) return 70;
+    if (t.includes(q)) return 50;
+    return 0;
+  }
+
+  function initView(options = {}) {
+    const {
+      container,
+      getEntryLimit,
+      renderEntries,
+      toggleViewParam,
+      onRandom,
+      randomKey = null,
+      renderLoading,
+      renderError,
+      onHelpCreated,
+      onHelpClose,
+    } = options;
+
+    const params = new URLSearchParams(window.location.search);
+    let currentSheet = params.get("or") === "shouldiwatchit" || params.get("l") === "w" ? "watchlist" : "films";
+    const userFromUrl = params.get("u") || "";
+    const state = { cachedEntries: [], currentSheet };
+
+    const setLoading = (message) => {
+      if (!container) return;
+      const msg = message || "";
+      if (typeof renderLoading === "function") {
+        renderLoading(msg);
+      } else {
+        container.innerHTML = `<div class="loading"><span>${msg}</span></div>`;
+      }
+    };
+
+    const setError = (message) => {
+      if (!container) return;
+      const msg = message || "";
+      if (typeof renderError === "function") {
+        renderError(msg);
+      } else {
+        setLoading(msg);
+      }
+    };
+
+    const ensureWatchlistQueryOrder = () => {
+      if (state.currentSheet !== "watchlist") return;
+      const qs = buildSearchString(new URLSearchParams(window.location.search));
+      if (window.location.search.slice(1) !== qs) {
+        window.history.replaceState({}, "", `?${qs}`);
+      }
+    };
+
+    ensureWatchlistQueryOrder();
+
+    let helpRef = null;
+
+    const loadEntries = async () => {
+      const csvText = await fetch(window.AppData.getCsvUrl(state.currentSheet)).then((res) => res.text());
+      let entries = window.AppData.parseCsv(csvText)
+        .filter((row) => row.name && row.year)
+        .sort((a, b) => b.date.localeCompare(a.date));
+      const limit = typeof getEntryLimit === "function" ? getEntryLimit() : null;
+      if (limit) entries = entries.slice(0, limit);
+      state.cachedEntries = entries;
+      if (typeof renderEntries === "function") renderEntries(entries, { source: "sheet", currentSheet: state.currentSheet });
+      return entries;
+    };
+
+    const loadIntersectFromId = async (rawId) => {
+      const id = normalizeId(rawId);
+      if (!id) {
+        const nextParams = new URLSearchParams(window.location.search);
+        nextParams.delete("u");
+        window.history.replaceState({}, "", `?${buildSearchString(nextParams)}`);
+        if (helpRef && helpRef.setMatchUserMode) helpRef.setMatchUserMode(false);
+        return loadEntries();
+      }
+
+      setLoading(`Loading watchlist for ${id}…`);
+      try {
+        const externalUris = await fetchExternalUris(id);
+        if (!externalUris || !externalUris.length) {
+          throw new Error("Watchlist scrape returned empty list");
+        }
+        const rows = await window.AppData.fetchSheetWatchlistIntersection(externalUris);
+        const matches = rows
+          .filter((row) => row.name && row.year)
+          .sort((a, b) => b.date.localeCompare(a.date));
+        state.cachedEntries = matches;
+
+        const nextParams = new URLSearchParams(window.location.search);
+        nextParams.set("u", id);
+        window.history.replaceState({}, "", `?${buildSearchString(nextParams)}`);
+        if (helpRef && helpRef.setMatchUserMode) helpRef.setMatchUserMode(true, id);
+
+        if (typeof renderEntries === "function") renderEntries(matches, { source: "match", matchUser: id, currentSheet: state.currentSheet });
+      } catch (err) {
+        setError(`Falhou a watchlist de ${id}: ${err.message}`);
+      }
+    };
+
+    const helpOptions = {
+      currentList: state.currentSheet,
+      matchUserMode: !!userFromUrl,
+      matchUserUsername: userFromUrl || "",
+      onMatchUserExit: async () => {
+        const nextParams = new URLSearchParams(window.location.search);
+        nextParams.delete("u");
+        window.history.replaceState({}, "", `?${buildSearchString(nextParams)}`);
+        if (helpRef && helpRef.setMatchUserMode) helpRef.setMatchUserMode(false);
+        await loadEntries();
+      },
+      onToggleView: () => {
+        const nextParams = new URLSearchParams(window.location.search);
+        nextParams.set("in", toggleViewParam || "full");
+        window.location.search = buildSearchString(nextParams);
+      },
+      onRandom,
+      onToggleList: async (nextList) => {
+        state.currentSheet = nextList;
+        const nextParams = new URLSearchParams(window.location.search);
+        if (state.currentSheet === "watchlist") {
+          nextParams.set("or", "shouldiwatchit");
+        } else {
+          nextParams.delete("or");
+          nextParams.delete("l");
+        }
+        window.history.replaceState({}, "", `?${buildSearchString(nextParams)}`);
+        window.HelpUI.setListToggle(helpRef && helpRef.toggle, state.currentSheet);
+        await loadEntries();
+      },
+      onUsersSubmit: loadIntersectFromId,
+      onClose: onHelpClose || undefined,
+    };
+
+    const help = window.HelpUI.createHelpUI(helpOptions);
+    helpRef = help;
+    if (help.idInput && userFromUrl) help.idInput.value = userFromUrl;
+    window.HelpUI.setListToggle(help.toggle, state.currentSheet);
+    window.HelpUI.setupCommonHotkeys(help, {
+      onToggleView: helpOptions.onToggleView,
+      onRandom,
+      randomKey,
+    });
+
+    if (typeof onHelpCreated === "function") {
+      onHelpCreated(help, { loadEntries, loadIntersectFromId, getState: () => state });
+    }
+
+    (async () => {
+      await loadEntries();
+      if (userFromUrl) await loadIntersectFromId(userFromUrl);
+    })();
+
+    return { help, loadEntries, loadIntersectFromId, getState: () => state };
+  }
 
   function buildMenu() {
     const menu = document.createElement("div");
@@ -21,13 +218,39 @@
     const list = document.createElement("div");
     list.className = "help-menu__list";
 
+    const tipsItem = document.createElement("button");
+    tipsItem.type = "button";
+    tipsItem.className = "help-menu__item";
+    tipsItem.dataset.action = "tips";
+    tipsItem.setAttribute("role", "menuitem");
+    tipsItem.setAttribute("data-focusable", "true");
+    tipsItem.setAttribute("aria-expanded", "false");
+    tipsItem.innerHTML =
+      '<span class="help-menu__label">Tips</span><span class="help-menu__icon" aria-hidden="true">💡</span>';
+
+    const tipsDetails = document.createElement("div");
+    tipsDetails.className = "help-menu__details";
+    const tipsList = document.createElement("div");
+    tipsList.className = "help-menu__tips";
+    [
+      "Switch between seen and watchlist film lists from Letterboxd.",
+      "You can search, pick a random title, and change the view.",
+      "Should We Watch It? shows a matching watchlist with another letterboxd user.",
+    ].forEach((tip) => {
+      const p = document.createElement("p");
+      p.className = "help-menu__tip";
+      p.textContent = tip;
+      tipsList.appendChild(p);
+    });
+    tipsDetails.append(tipsList);
+
     const shortcutsItem = document.createElement("button");
     shortcutsItem.type = "button";
     shortcutsItem.className = "help-menu__item";
     shortcutsItem.dataset.action = "shortcuts";
     shortcutsItem.setAttribute("role", "menuitem");
     shortcutsItem.setAttribute("data-focusable", "true");
-    shortcutsItem.setAttribute("aria-expanded", "true");
+    shortcutsItem.setAttribute("aria-expanded", "false");
     shortcutsItem.innerHTML =
       '<span class="help-menu__label">Shortcuts</span><span class="help-menu__icon" aria-hidden="true">⌘</span>';
 
@@ -54,10 +277,15 @@
     });
     shortcutsDetails.append(shortcutsList);
 
-    list.append(shortcutsItem, shortcutsDetails);
+    tipsDetails.hidden = false;
+    tipsItem.setAttribute("aria-expanded", "true");
+    shortcutsDetails.hidden = false;
+    shortcutsItem.setAttribute("aria-expanded", "true");
+
+    list.append(tipsItem, tipsDetails, shortcutsItem, shortcutsDetails);
     menu.appendChild(list);
 
-    return { menu, shortcutsItem, shortcutsDetails };
+    return { menu, tipsItem, tipsDetails, shortcutsItem, shortcutsDetails };
   }
 
   function createHelpUI(options) {
@@ -77,11 +305,13 @@
     const btnSeen = makeBtn("fa-regular fa-eye", "Seen");
     const btnWatch = makeBtn("fa-regular fa-eye-slash", "To watch");
     const btnUsers = makeBtn("fa-solid fa-users", "Letterboxd ID");
+    const btnRandom = makeBtn("fa-solid fa-bolt", "Random pick");
     const btnSearch = makeBtn("fa-solid fa-magnifying-glass", "Search");
     const btnHelp = makeBtn("fa-solid fa-ellipsis-vertical", "Help and shortcuts");
     btnHelp.classList.add("menu__btn--help");
     btnSearch.classList.add("menu__btn--search");
     btnUsers.classList.add("menu__btn--id");
+    btnRandom.classList.add("menu__btn--random");
     const inlineSearch = document.createElement("input");
     inlineSearch.type = "search";
     inlineSearch.className = "help-inline-search";
@@ -114,7 +344,7 @@
     btnHelp.setAttribute("aria-expanded", "false");
 
     const built = buildMenu();
-    const { menu, shortcutsItem, shortcutsDetails } = built;
+    const { menu, tipsItem, tipsDetails, shortcutsItem, shortcutsDetails } = built;
 
     const modeGroup = document.createElement("div");
     modeGroup.className = "mode-buttons";
@@ -122,7 +352,7 @@
 
     let searchInput = inlineSearch;
 
-    container.append(modeGroup, btnUsers, btnSearch, btnHelp, menu);
+    container.append(modeGroup, btnUsers, btnRandom, btnSearch, btnHelp, menu);
     document.body.appendChild(container);
 
     let isOpen = false;
@@ -188,6 +418,10 @@
       menu.style.display = "none";
       menu.classList.remove("is-open");
       menu.setAttribute("aria-hidden", "true");
+      tipsDetails.hidden = true;
+      tipsItem.setAttribute("aria-expanded", "false");
+      shortcutsDetails.hidden = true;
+      shortcutsItem.setAttribute("aria-expanded", "false");
       document.removeEventListener("mousedown", handleDocumentMouseDown, true);
       document.removeEventListener("keydown", handleKeyDown, true);
       window.removeEventListener("resize", positionMenu);
@@ -203,6 +437,11 @@
       menu.style.display = "block";
       menu.classList.add("is-open");
       menu.setAttribute("aria-hidden", "false");
+      // Default: show tips and shortcuts when opening
+      tipsDetails.hidden = false;
+      tipsItem.setAttribute("aria-expanded", "true");
+      shortcutsDetails.hidden = false;
+      shortcutsItem.setAttribute("aria-expanded", "true");
       positionMenu();
       document.addEventListener("mousedown", handleDocumentMouseDown, true);
       document.addEventListener("keydown", handleKeyDown, true);
@@ -235,6 +474,19 @@
       const next = activeMode === "seen" ? "watchlist" : "seen";
       applyMode(next, true);
     };
+
+    const toggleDetails = (detailsEl, trigger) => {
+      const willOpen = detailsEl.hidden;
+      detailsEl.hidden = !willOpen;
+      trigger.setAttribute("aria-expanded", willOpen ? "true" : "false");
+      if (willOpen) {
+        const firstRow = detailsEl.querySelector(".help-modal__row");
+        if (firstRow && firstRow.focus) firstRow.focus();
+      }
+    };
+
+    const toggleShortcutsDetails = () => toggleDetails(shortcutsDetails, shortcutsItem);
+    const toggleTipsDetails = () => toggleDetails(tipsDetails, tipsItem);
 
     const handleKeyDown = (event) => {
       const key = event.key;
@@ -306,19 +558,20 @@
           toggleShortcutsDetails();
           return;
         }
+        if (target.dataset.action === "tips") {
+          event.preventDefault();
+          toggleTipsDetails();
+          return;
+        }
       }
     };
-
-    const toggleShortcutsDetails = () => {
-      shortcutsDetails.hidden = false;
-      shortcutsItem.setAttribute("aria-expanded", "true");
-      const firstShortcut = shortcutsDetails.querySelector(".help-modal__row");
-      if (firstShortcut && firstShortcut.focus) firstShortcut.focus();
-    };
-
     shortcutsItem.addEventListener("click", (event) => {
       event.stopPropagation();
       toggleShortcutsDetails();
+    });
+    tipsItem.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleTipsDetails();
     });
 
     // Prevent menu closing when clicking inside
@@ -379,6 +632,11 @@
       } else {
         expandInlineSearch();
       }
+    });
+
+    btnRandom.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (typeof opts.onRandom === "function") opts.onRandom();
     });
 
     inlineSearch.addEventListener("keydown", (event) => {
@@ -612,4 +870,10 @@
   }
 
   window.HelpUI = { createHelpUI, setupCommonHotkeys, setListToggle, buildSearchString };
+  window.AppCommon = {
+    normalizeId,
+    fetchExternalUris,
+    scoreSearchText,
+    initView,
+  };
 })();

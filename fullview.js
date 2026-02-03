@@ -3,40 +3,8 @@ let cachedEntries = [];
 let clipPosts = [];
 let clipsReady = false;
 let clipTicking = false;
-let currentSheet = window.AppData.DEFAULT_SHEET;
-
-function normalizeId(value) {
-  return String(value || "").trim().toLowerCase().replace(/^@+/, "");
-}
-
-let watchlistInFlight = null;
-
-const WATCHLIST_API_URL = "https://haveiwatchit.fly.dev/api/watchlist";
-
-async function fetchExternalUris(username) {
-  const id = normalizeId(username);
-  if (!id) throw new Error("Username is required");
-
-  if (watchlistInFlight && watchlistInFlight.id === id) {
-    return watchlistInFlight.promise;
-  }
-  const promise = (async () => {
-    const res = await fetch(`${WATCHLIST_API_URL}?user=${encodeURIComponent(id)}`, { cache: "no-store" });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(err.error || `HTTP ${res.status}`);
-    }
-    const uris = await res.json();
-    if (!Array.isArray(uris)) throw new Error("Invalid response: expected array of URIs");
-    return uris;
-  })();
-  watchlistInFlight = { id, promise };
-  try {
-    return await promise;
-  } finally {
-    if (watchlistInFlight && watchlistInFlight.id === id) watchlistInFlight = null;
-  }
-}
+let viewState = { currentSheet: window.AppData.DEFAULT_SHEET };
+let helpRef = null;
 
 function getEntryLimit() {
   const isSmall = window.matchMedia("(max-width: 768px)").matches;
@@ -168,24 +136,15 @@ function setupSearch(input) {
   input.addEventListener("input", () => {
     const query = input.value.trim().toLowerCase();
     if (!query) {
-      renderEntries(cachedEntries, "");
+      renderEntries(cachedEntries, "", viewState.currentSheet);
       return;
-    }
-
-    function scoreText(text, q) {
-      if (!text) return 0;
-      const t = text.toLowerCase();
-      if (t === q) return 100;
-      if (t.startsWith(q)) return 80;
-      if (new RegExp(`\\b${q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(t)) return 70;
-      if (t.includes(q)) return 50;
-      return 0;
     }
 
     const scored = cachedEntries
       .map((entry) => {
-        const nameScore = scoreText(entry.name, query);
-        const directorScore = scoreText(entry.director || "", query) * 0.8;
+        const nameScore = window.AppCommon.scoreSearchText(entry.name, query);
+        const directorScore =
+          window.AppCommon.scoreSearchText(entry.director || "", query) * 0.8;
         const score = Math.max(nameScore, directorScore);
         return { entry, score };
       })
@@ -193,11 +152,11 @@ function setupSearch(input) {
       .sort((a, b) => b.score - a.score || b.entry.date.localeCompare(a.entry.date))
       .map((item) => item.entry);
 
-    renderEntries(scored, query);
+    renderEntries(scored, query, viewState.currentSheet);
   });
 }
 
-function renderEntries(entries, searchQuery = "") {
+function renderEntries(entries, searchQuery = "", sheet = window.AppData.DEFAULT_SHEET) {
   feed.innerHTML = "";
   const usePoster = window.matchMedia("(orientation: portrait)").matches;
 
@@ -221,7 +180,7 @@ function renderEntries(entries, searchQuery = "") {
     const letterboxdWatchlist = "https://letterboxd.com/ritsaptcs/watchlist/";
     const letterboxdSearch = `https://letterboxd.com/search/${encodeURIComponent(q)}`;
     const msg =
-      currentSheet === "watchlist"
+      sheet === "watchlist"
         ? `Should I watch <u>${q}</u>?\n\nmaybe, but it's not in your <a href="${letterboxdWatchlist}" target="_blank" rel="noopener noreferrer">watchlist</a>`
         : `Have I seen <u>${q}</u>?\nno. (<a href="${letterboxdSearch}" target="_blank" rel="noopener noreferrer">did I</a>?)`;
     feed.innerHTML = `<div class="loading"><span>${msg.replace(/\n/g, "<br>")}</span></div>`;
@@ -231,114 +190,26 @@ function renderEntries(entries, searchQuery = "") {
   initClips();
 }
 
-async function init() {
-  const params = new URLSearchParams(window.location.search);
-  currentSheet = (params.get("or") === "shouldiwatchit" || params.get("l") === "w") ? "watchlist" : "films";
-  if (currentSheet === "watchlist") {
-    const qs = window.HelpUI.buildSearchString(params);
-    if (window.location.search.slice(1) !== qs) {
-      window.history.replaceState({}, "", `?${qs}`);
-    }
-  }
-
-  async function loadEntries() {
-    const csvText = await fetch(window.AppData.getCsvUrl(currentSheet)).then((res) => res.text());
-    cachedEntries = window.AppData.parseCsv(csvText)
-      .filter((row) => row.name && row.year)
-      .sort((a, b) => b.date.localeCompare(a.date));
-    const limit = getEntryLimit();
-    if (limit) cachedEntries = cachedEntries.slice(0, limit);
-    renderEntries(cachedEntries, help.input?.value?.trim() ?? "");
-  }
-
-  async function loadIntersectFromId(rawId) {
-    const id = normalizeId(rawId);
-    if (!id) {
-      const nextParams = new URLSearchParams(window.location.search);
-      nextParams.delete("u");
-      window.history.replaceState({}, "", `?${window.HelpUI.buildSearchString(nextParams)}`);
-      if (helpRef && helpRef.setMatchUserMode) helpRef.setMatchUserMode(false);
-      await loadEntries();
-      return;
-    }
-
-    feed.innerHTML = `<div class="loading"><span>Loading watchlist for ${id}…</span></div>`;
-    try {
-      const externalUris = await fetchExternalUris(id);
-      if (!externalUris || !externalUris.length) {
-        throw new Error("Watchlist scrape returned empty list");
-      }
-      const rows = await window.AppData.fetchSheetWatchlistIntersection(externalUris);
-      const matches = rows
-        .filter((row) => row.name && row.year)
-        .sort((a, b) => b.date.localeCompare(a.date));
-      console.log("[watchlist] matches found:", matches.length, matches.map((r) => ({ name: r.name, year: r.year, uri: r.filmUri || r.letterboxdUri })));
-      cachedEntries = matches;
-
-      const nextParams = new URLSearchParams(window.location.search);
-      nextParams.set("u", id);
-      window.history.replaceState({}, "", `?${window.HelpUI.buildSearchString(nextParams)}`);
-      if (helpRef && helpRef.setMatchUserMode) helpRef.setMatchUserMode(true, id);
-
-      renderEntries(cachedEntries, help.input?.value?.trim() ?? "");
-    } catch (err) {
-      feed.innerHTML = `<div class="loading"><span>Falhou a watchlist de ${id}: ${err.message}</span></div>`;
-    }
-  }
-
-  let helpRef = null;
-  const userFromUrl = params.get("u");
-  const help = window.HelpUI.createHelpUI({
-    currentList: currentSheet,
-    matchUserMode: !!userFromUrl,
-    matchUserUsername: userFromUrl || "",
-    onMatchUserExit: async () => {
-      const nextParams = new URLSearchParams(window.location.search);
-      nextParams.delete("u");
-      window.history.replaceState({}, "", `?${window.HelpUI.buildSearchString(nextParams)}`);
-      if (helpRef && helpRef.setMatchUserMode) helpRef.setMatchUserMode(false);
-      await loadEntries();
-    },
-    onToggleView: () => {
-      const nextParams = new URLSearchParams(window.location.search);
-      nextParams.set("in", "slot");
-      window.location.search = window.HelpUI.buildSearchString(nextParams);
-    },
-    onRandom: randomFilm,
-    onToggleList: async (nextList) => {
-      currentSheet = nextList;
-      const nextParams = new URLSearchParams(window.location.search);
-      if (currentSheet === "watchlist") {
-        nextParams.set("or", "shouldiwatchit");
-      } else {
-        nextParams.delete("or");
-      }
-      window.history.replaceState({}, "", `?${window.HelpUI.buildSearchString(nextParams)}`);
-      window.HelpUI.setListToggle(help.toggle, currentSheet);
-      await loadEntries();
-    },
-    onUsersSubmit: loadIntersectFromId,
-  });
-  helpRef = help;
-  window.HelpUI.setListToggle(help.toggle, currentSheet);
-  window.HelpUI.setupCommonHotkeys(help, {
-    onToggleView: () => {
-      const nextParams = new URLSearchParams(window.location.search);
-      nextParams.set("in", "slot");
-      window.location.search = window.HelpUI.buildSearchString(nextParams);
-    },
-    onRandom: randomFilm,
-    randomKey: "Space",
-  });
-
-  setupSearch(help.input);
-
-  await loadEntries();
-
-  if (userFromUrl) {
-    if (help.idInput) help.idInput.value = userFromUrl;
-    await loadIntersectFromId(userFromUrl);
-  }
-}
-
-init();
+window.AppCommon.initView({
+  container: feed,
+  getEntryLimit,
+  renderEntries: (entries, meta = {}) => {
+    cachedEntries = entries;
+    viewState.currentSheet = meta.currentSheet || viewState.currentSheet;
+    const searchValue = helpRef?.input?.value?.trim() ?? "";
+    renderEntries(entries, searchValue, viewState.currentSheet);
+  },
+  toggleViewParam: "slot",
+  onRandom: randomFilm,
+  randomKey: "Space",
+  renderLoading: (message) => {
+    feed.innerHTML = `<div class=\"loading\"><span>${message}</span></div>`;
+  },
+  renderError: (message) => {
+    feed.innerHTML = `<div class=\"loading\"><span>${message}</span></div>`;
+  },
+  onHelpCreated: (help) => {
+    helpRef = help;
+    setupSearch(help.input);
+  },
+});

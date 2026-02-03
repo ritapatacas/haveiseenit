@@ -1,3 +1,31 @@
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: #000;
+  color: rgba(255, 255, 255, 0.9);
+  font: 300 14px/1.45 "Red Hat Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  overflow-x: hidden;
+}
+
+.loading {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.loading a {
+  pointer-events: auto;
+  color: inherit;
+  text-decoration: underline;
+}
+
 :root {
   --help-surface: rgba(20, 21, 24, 0.94);
   --help-border: rgba(255, 255, 255, 0.08);
@@ -85,6 +113,17 @@
   border: 1px solid var(--help-border);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
   transition: width 180ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+
+.menu__btn--random {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  background: rgba(18, 19, 22, 0.76);
+  border: 1px solid var(--help-border);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  transition: background 120ms ease, box-shadow 120ms ease, transform 120ms ease;
 }
 
 .menu__btn--id {
@@ -476,6 +515,8 @@
 
 .help-shortcuts__desc {
   color: var(--help-label);
+  font-size: 12px;
+
 }
 
 .help-menu--m3 {
@@ -606,11 +647,23 @@
   padding: 0px 16px 0px 8px;
 }
 
+.help-menu__tips {
+  display: grid;
+  gap: 6px;
+  padding: 2px 8px 4px 8px;
+}
+
+.help-menu__tip {
+  margin: 0;
+  color: var(--help-muted);
+  font: 200 12px/1.35 "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
 .help-modal__row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--help-label);
 }
 

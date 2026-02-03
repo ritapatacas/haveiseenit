@@ -9,40 +9,44 @@
     const qs = params.toString();
     if (qs) window.history.replaceState({}, "", `?${qs}`);
   }
-  const useColumns = inParam === "slot" || (!inParam && vParam === "col");
+  const useSlot = inParam === "slot" || (!inParam && vParam === "col");
 
   const feed = document.getElementById("feed");
-  const columns = document.getElementById("columns");
-  if (useColumns) {
+  const slot = document.getElementById("slot");
+  if (useSlot) {
     if (feed) feed.remove();
-  } else if (columns) {
-    columns.remove();
+  } else if (slot) {
+    slot.remove();
   }
 
   const css = document.createElement("link");
   css.rel = "stylesheet";
-  css.href = useColumns ? "columnsview.css" : "fullview.css";
+  css.href = useSlot ? "app/styles/slotview.css" : "app/styles/fullview.css";
   document.head.appendChild(css);
 
   const commonCss = document.createElement("link");
   commonCss.rel = "stylesheet";
-  commonCss.href = "common.css";
+  commonCss.href = "app/styles/common.css";
   document.head.appendChild(commonCss);
 
   const fa = document.createElement("link");
   fa.rel = "stylesheet";
-  fa.href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css";
+  fa.href =
+    (window.AppConstants && window.AppConstants.FONT_AWESOME_URL) ||
+    "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css";
   fa.referrerPolicy = "no-referrer";
   document.head.appendChild(fa);
 
   const commonScript = document.createElement("script");
-  commonScript.src = "common.js";
+  commonScript.src = "app/scripts/common/common.js";
   commonScript.onload = () => {
     const dataScript = document.createElement("script");
-    dataScript.src = "data.js";
+    dataScript.src = "app/scripts/common/data.js";
     dataScript.onload = () => {
       const script = document.createElement("script");
-      script.src = useColumns ? "columnsview.js" : "fullview.js";
+      script.src = useSlot
+        ? "app/scripts/view/slot/slotview.js"
+        : "app/scripts/view/full/fullview.js";
       document.body.appendChild(script);
     };
     document.body.appendChild(dataScript);

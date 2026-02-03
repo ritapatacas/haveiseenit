@@ -4,7 +4,9 @@
     watchlist: "search your watchlist",
   };
 
-  const WATCHLIST_API_URL = "https://haveiwatchit.fly.dev/api/watchlist";
+  const WATCHLIST_API_URL =
+    (window.AppConstants && window.AppConstants.WATCHLIST_API_URL) ||
+    "https://haveiwatchit.fly.dev/api/watchlist";
   let watchlistInFlight = null;
 
   const isTypingTarget = (el) =>
@@ -232,11 +234,8 @@
     tipsDetails.className = "help-menu__details";
     const tipsList = document.createElement("div");
     tipsList.className = "help-menu__tips";
-    [
-      "Switch between seen and watchlist film lists from Letterboxd.",
-      "You can search, pick a random title, and change the view.",
-      "Should We Watch It? shows a matching watchlist with another letterboxd user.",
-    ].forEach((tip) => {
+    const tipsCopy = (window.AppCopy && Array.isArray(window.AppCopy.tips) && window.AppCopy.tips) || [];
+    tipsCopy.forEach((tip) => {
       const p = document.createElement("p");
       p.className = "help-menu__tip";
       p.textContent = tip;
@@ -870,10 +869,5 @@
   }
 
   window.HelpUI = { createHelpUI, setupCommonHotkeys, setListToggle, buildSearchString };
-  window.AppCommon = {
-    normalizeId,
-    fetchExternalUris,
-    scoreSearchText,
-    initView,
-  };
+  window.AppCommon = { normalizeId, fetchExternalUris, scoreSearchText, initView };
 })();

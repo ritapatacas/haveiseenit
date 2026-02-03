@@ -1,4 +1,5 @@
 const feed = document.getElementById("feed");
+const FULL_CONFIG = { mobileEntryLimit: 40 };
 let cachedEntries = [];
 let clipPosts = [];
 let clipsReady = false;
@@ -8,7 +9,7 @@ let helpRef = null;
 
 function getEntryLimit() {
   const isSmall = window.matchMedia("(max-width: 768px)").matches;
-  return isSmall ? 40 : null;
+  return isSmall ? FULL_CONFIG.mobileEntryLimit : null;
 }
 
 function ratingToStars(rating) {

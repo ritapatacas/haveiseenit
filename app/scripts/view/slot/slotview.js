@@ -1,17 +1,23 @@
-const columnsRoot = document.getElementById("columns");
+const slotRoot = document.getElementById("slot");
+
+const SLOT_CONFIG = {
+  SLOT_MACHINE_GRACE_MS: 500,
+  columnBreakpoints: [520, 680, 840, 1000, 1160, 1320, 1480, 1640, 1800, 1960],
+};
 
 function getColumnCount() {
   const w = window.innerWidth;
-  if (w <= 520) return 2;
-  if (w <= 680) return 3;
-  if (w <= 840) return 4;
-  if (w <= 1000) return 5;
-  if (w <= 1160) return 6;
-  if (w <= 1320) return 7;
-  if (w <= 1480) return 8;
-  if (w <= 1640) return 9;
-  if (w <= 1800) return 10;
-  if (w <= 1960) return 11;
+  const bps = SLOT_CONFIG.columnBreakpoints;
+  if (w <= bps[0]) return 2;
+  if (w <= bps[1]) return 3;
+  if (w <= bps[2]) return 4;
+  if (w <= bps[3]) return 5;
+  if (w <= bps[4]) return 6;
+  if (w <= bps[5]) return 7;
+  if (w <= bps[6]) return 8;
+  if (w <= bps[7]) return 9;
+  if (w <= bps[8]) return 10;
+  if (w <= bps[9]) return 11;
   return 12;
 }
 
@@ -109,11 +115,11 @@ function setupWheelScroll(column) {
   );
 }
 
-function setupLinkedScroll(columns) {
+function setupLinkedScroll(slotColumns) {
   const lastScrollTop = new WeakMap();
   let syncing = false;
 
-  columns.forEach((column) => {
+  slotColumns.forEach((column) => {
     lastScrollTop.set(column, column.scrollTop);
 
     column.addEventListener("scroll", () => {
@@ -123,12 +129,12 @@ function setupLinkedScroll(columns) {
       lastScrollTop.set(column, current);
 
       if (isProgrammaticFocus) return;
-      if (Date.now() - lastSlotMachineEnd < SLOT_MACHINE_GRACE_MS) return;
+      if (Date.now() - lastSlotMachineEnd < SLOT_CONFIG.SLOT_MACHINE_GRACE_MS) return;
       if (!syncing && delta !== 0) clearHighlight();
       if (syncing || delta === 0) return;
 
       syncing = true;
-      columns.forEach((other) => {
+      slotColumns.forEach((other) => {
         if (other === column) return;
         const distance = Math.abs(other.dataset.index - column.dataset.index);
         const factor = 0.6 / Math.max(1, distance);
@@ -140,7 +146,7 @@ function setupLinkedScroll(columns) {
   });
 }
 
-function renderColumns(
+function renderSlot(
   entries,
   offset = 0,
   focusKeys = null,
@@ -150,30 +156,30 @@ function renderColumns(
   const withImages = entries.filter((entry) => getEntryImage(entry));
   const count = getColumnCount();
   const token = ++renderToken;
-  columnOffset = offset;
+  slotOffset = offset;
 
-  columnsRoot.style.setProperty("--cols", String(count));
-  columnsRoot.innerHTML = "";
+  slotRoot.style.setProperty("--cols", String(count));
+  slotRoot.innerHTML = "";
 
-  const columns = Array.from({ length: count }, () => []);
+  const slotColumns = Array.from({ length: count }, () => []);
   withImages.forEach((entry, index) => {
     const entryKey = `${entry.name}||${entry.year}`.toLowerCase();
     const hasMatchColumn = matchColumnMap && matchColumnMap.has(entryKey);
     const colIndex = hasMatchColumn
       ? matchColumnMap.get(entryKey)
       : (index + offset) % count;
-    columns[colIndex].push(entry);
+    slotColumns[colIndex].push(entry);
   });
-  columnEls = [];
-  columns.forEach((items, index) => {
+  slotEls = [];
+  slotColumns.forEach((items, index) => {
     const column = document.createElement("div");
     column.className = "column";
     column.dataset.index = String(index);
 
     const track = buildTrack(items);
     column.appendChild(track);
-    columnsRoot.appendChild(column);
-    columnEls.push(column);
+    slotRoot.appendChild(column);
+    slotEls.push(column);
 
     setupInfiniteScroll(
       column,
@@ -184,7 +190,7 @@ function renderColumns(
     setupWheelScroll(column);
   });
 
-  setupLinkedScroll(columnEls);
+  setupLinkedScroll(slotEls);
   if (focusKeys && focusKeys.size) {
     highlightByKeys(focusKeys);
     queueFocusMatches(focusKeys, focusKey, token);
@@ -237,9 +243,9 @@ function getCenteredTargetTop(column, items) {
 }
 
 function focusInCenter(focusKey) {
-  if (!focusKey || !columnEls.length) return;
-  const centerIndex = Math.floor(columnEls.length / 2);
-  const column = columnEls[centerIndex];
+  if (!focusKey || !slotEls.length) return;
+  const centerIndex = Math.floor(slotEls.length / 2);
+  const column = slotEls[centerIndex];
   if (!column) return;
 
   const items = Array.from(column.querySelectorAll(".column__item"));
@@ -262,12 +268,12 @@ function focusInCenter(focusKey) {
 }
 
 function focusMatchesInColumns(focusKeys, focusKey, token, retriesLeft = 0) {
-  if (!focusKeys || !focusKeys.size || !columnEls.length) return;
-  const centerIndex = Math.floor(columnEls.length / 2);
+  if (!focusKeys || !focusKeys.size || !slotEls.length) return;
+  const centerIndex = Math.floor(slotEls.length / 2);
   isProgrammaticFocus = true;
   let needsRetry = false;
 
-  columnEls.forEach((column, index) => {
+  slotEls.forEach((column, index) => {
     const items = Array.from(column.querySelectorAll(".column__item"));
     if (!items.length) return;
 
@@ -317,7 +323,7 @@ function setupSearch(input) {
   input.addEventListener("input", () => {
     const query = input.value.trim().toLowerCase();
     if (!query) {
-      renderColumns(cachedEntries, 0, null, "", null);
+      renderSlot(cachedEntries, 0, null, "", null);
       clearHighlight();
       return;
     }
@@ -357,7 +363,7 @@ function setupSearch(input) {
     const focusKeys = new Set(matchKeys);
     const focusKey = `${match.name}||${match.year}`.toLowerCase();
     const matchColumnMap = buildMatchColumnMap(matchKeys, count, centerIndex);
-    renderColumns(cachedEntries, offset, focusKeys, focusKey, matchColumnMap);
+    renderSlot(cachedEntries, offset, focusKeys, focusKey, matchColumnMap);
   });
 }
 
@@ -436,17 +442,16 @@ function buildMatchColumnMap(matchKeys, count, centerIndex) {
 }
 
 let cachedEntries = [];
-let columnEls = [];
-let columnOffset = 0;
+let slotEls = [];
+let slotOffset = 0;
 let renderToken = 0;
 let isProgrammaticFocus = false;
 let isSlotMachineSpinning = false;
 let lastSlotMachineEnd = 0;
-const SLOT_MACHINE_GRACE_MS = 500;
 
 function clearHighlight() {
-  columnsRoot.classList.remove("is-dim");
-  columnEls.forEach((col) => {
+  slotRoot.classList.remove("is-dim");
+  slotEls.forEach((col) => {
     col.querySelectorAll(".column__item.is-active").forEach((el) => {
       el.classList.remove("is-active");
     });
@@ -455,8 +460,8 @@ function clearHighlight() {
 
 function highlightByKeys(keys) {
   if (!keys || !keys.size) return;
-  columnsRoot.classList.add("is-dim");
-  columnEls.forEach((col) => {
+  slotRoot.classList.add("is-dim");
+  slotEls.forEach((col) => {
     col.querySelectorAll(".column__item").forEach((el) => {
       const k = (el.dataset.key || "").toLowerCase();
       if (keys.has(k)) {
@@ -471,7 +476,7 @@ function highlightByKeys(keys) {
 function addHighlightToKeys(keys) {
   const set = Array.isArray(keys) ? new Set(keys) : keys;
   if (!set || !set.size) return;
-  columnEls.forEach((col) => {
+  slotEls.forEach((col) => {
     col.querySelectorAll(".column__item").forEach((el) => {
       const k = (el.dataset.key || "").toLowerCase();
       if (set.has(k)) el.classList.add("is-active");
@@ -502,15 +507,15 @@ function getItemClosestToViewportCenter(column) {
 }
 
 function randomInCenterColumn() {
-  if (!columnEls.length) return;
+  if (!slotEls.length) return;
 
   isProgrammaticFocus = true;
   isSlotMachineSpinning = true;
   clearHighlight();
-  columnsRoot.classList.add("is-dim");
+  slotRoot.classList.add("is-dim");
 
   const focusKeys = new Set();
-  const states = columnEls.map((column) => ({
+  const states = slotEls.map((column) => ({
     column,
     speed: 18 + Math.random() * 25,
     friction: 0.97 + Math.random() * 0.015,
@@ -569,31 +574,31 @@ window.addEventListener("resize", () => {
   if (!cachedEntries.length) return;
   window.clearTimeout(resizeTimer);
   resizeTimer = window.setTimeout(() => {
-    renderColumns(cachedEntries);
+    renderSlot(cachedEntries);
   }, 200);
 });
 window.AppCommon.initView({
-  container: columnsRoot,
+  container: slotRoot,
   getEntryLimit,
   renderEntries: (entries) => {
     cachedEntries = entries;
-    renderColumns(entries);
+    renderSlot(entries);
   },
   toggleViewParam: "full",
   onRandom: randomInCenterColumn,
   randomKey: null,
   renderLoading: (message) => {
-    columnsRoot.innerHTML = `<div class="loading">${message}</div>`;
+    slotRoot.innerHTML = `<div class="loading">${message}</div>`;
   },
   renderError: (message) => {
-    columnsRoot.innerHTML = `<div class="loading">${message}</div>`;
+    slotRoot.innerHTML = `<div class="loading">${message}</div>`;
   },
   onHelpCreated: (help) => {
     setupSearch(help.input);
   },
   onHelpClose: () => {
     if (cachedEntries.length) {
-      renderColumns(cachedEntries, 0, null, "", null);
+      renderSlot(cachedEntries, 0, null, "", null);
       clearHighlight();
     }
   },

@@ -1,11 +1,18 @@
 const feed = document.getElementById("feed");
-const FULL_CONFIG = { mobileEntryLimit: 40 };
+const FULL_CONFIG = {
+  mobileEntryLimit: 40,
+  /** Max number of posts that get background loaded at once (viewport + buffer) */
+  maxLoadedBackgrounds: 5,
+  /** Root margin for Intersection Observer: load background when within this distance of viewport */
+  lazyRootMargin: "100% 0px",
+};
 let cachedEntries = [];
 let clipPosts = [];
 let clipsReady = false;
 let clipTicking = false;
 let viewState = { currentSheet: window.AppData.DEFAULT_SHEET };
 let helpRef = null;
+let lazyObserver = null;
 
 function getEntryLimit() {
   const isSmall = window.matchMedia("(max-width: 768px)").matches;
@@ -79,36 +86,118 @@ function createPost({ name, year, director, letterboxdUri, rating, review, backd
 
 function updateClips() {
   const H = window.innerHeight;
+  const margin = H * 0.5;
+  let bestLayer = null;
+  let bestVisible = 0;
 
   for (const post of clipPosts) {
     const rect = post.getBoundingClientRect();
     const layer = post.querySelector(".post__fixed");
+    if (!layer) continue;
+
+    const inRange = rect.bottom >= -margin && rect.top <= H + margin;
+    if (!inRange) {
+      layer.style.clipPath = `inset(${H}px 0 0 0)`;
+      layer.classList.remove("post__fixed--active");
+      continue;
+    }
 
     const top = Math.max(0, rect.top);
     const bottom = Math.min(H, rect.bottom);
 
     if (bottom <= 0 || top >= H) {
       layer.style.clipPath = `inset(${H}px 0 0 0)`;
+      layer.classList.remove("post__fixed--active");
       continue;
     }
 
     const insetTop = top;
     const insetBottom = H - bottom;
-
     layer.style.clipPath = `inset(${insetTop}px 0 ${insetBottom}px 0)`;
+    layer.classList.remove("post__fixed--active");
+
+    const visibleHeight = bottom - top;
+    if (visibleHeight > bestVisible) {
+      bestVisible = visibleHeight;
+      bestLayer = layer;
+    }
   }
 
+  if (bestLayer) bestLayer.classList.add("post__fixed--active");
   clipTicking = false;
+}
+
+function setPostBackground(post, url) {
+  const layer = post.querySelector(".post__fixed");
+  if (!layer || !url) return;
+  const tmdb = window.AppTmdbImages;
+  const resolved = tmdb && tmdb.isTmdbImageUrl(url) ? tmdb.getTmdbUrlForContext(url, "backdrop") : url;
+  layer.style.backgroundImage = `url("${resolved}")`;
+}
+
+function clearPostBackground(post) {
+  const layer = post.querySelector(".post__fixed");
+  if (layer) layer.style.backgroundImage = "";
+}
+
+function setupLazyBackgrounds() {
+  if (lazyObserver) lazyObserver.disconnect();
+  clipPosts = Array.from(document.querySelectorAll(".post"));
+  if (!clipPosts.length) return;
+
+  const loadedSet = new Set();
+
+  lazyObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        const post = entry.target;
+        const url = post.dataset.bg;
+        if (!url) continue;
+
+        if (entry.isIntersecting) {
+          if (!post.dataset.bgLoaded) {
+            setPostBackground(post, url);
+            post.dataset.bgLoaded = "1";
+            loadedSet.add(post);
+          }
+        } else {
+          if (post.dataset.bgLoaded && loadedSet.size > FULL_CONFIG.maxLoadedBackgrounds) {
+            clearPostBackground(post);
+            delete post.dataset.bgLoaded;
+            loadedSet.delete(post);
+          }
+        }
+      }
+    },
+    {
+      root: null,
+      rootMargin: FULL_CONFIG.lazyRootMargin,
+      threshold: 0,
+    }
+  );
+
+  clipPosts.forEach((post) => {
+    if (post.dataset.bg) lazyObserver.observe(post);
+  });
+
+  /** Defer to after layout so getBoundingClientRect is correct (e.g. after search re-render) */
+  requestAnimationFrame(() => {
+    const firstInView = clipPosts.find((p) => {
+      const r = p.getBoundingClientRect();
+      return r.top < window.innerHeight && r.bottom > 0;
+    });
+    if (firstInView && firstInView.dataset.bg) {
+      setPostBackground(firstInView, firstInView.dataset.bg);
+      firstInView.dataset.bgLoaded = "1";
+      loadedSet.add(firstInView);
+    }
+  });
 }
 
 function initClips() {
   clipPosts = Array.from(document.querySelectorAll(".post"));
-  const vh = () => window.innerHeight;
 
-  for (const post of clipPosts) {
-    const layer = post.querySelector(".post__fixed");
-    layer.style.backgroundImage = `url("${post.dataset.bg}")`;
-  }
+  setupLazyBackgrounds();
 
   function onScrollOrResize() {
     if (clipTicking) return;
@@ -129,6 +218,8 @@ function randomFilm() {
   const posts = Array.from(document.querySelectorAll(".post"));
   if (!posts.length) return;
   const choice = posts[Math.floor(Math.random() * posts.length)];
+  /** Pre-load background so it’s loading before scroll ends (avoids flash when post was unloaded) */
+  if (choice.dataset.bg) setPostBackground(choice, choice.dataset.bg);
   choice.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -160,8 +251,11 @@ function setupSearch(input) {
 function renderEntries(entries, searchQuery = "", sheet = window.AppData.DEFAULT_SHEET) {
   feed.innerHTML = "";
   const usePoster = window.matchMedia("(orientation: portrait)").matches;
+  /** On mobile, only render limited posts when not searching (search uses full cachedEntries) */
+  const limit = !searchQuery ? getEntryLimit() : null;
+  const toRender = limit ? entries.slice(0, limit) : entries;
 
-  entries.forEach((entry) => {
+  toRender.forEach((entry) => {
     const backdropUrl = usePoster ? entry.poster || entry.image : entry.image || entry.poster;
     if (!backdropUrl) return;
     const post = createPost({

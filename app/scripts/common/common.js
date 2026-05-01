@@ -299,9 +299,9 @@
       return btn;
     };
 
-    const btnSeen = makeBtn("fa-regular fa-eye", "Seen");
-    const btnWatch = makeBtn("fa-regular fa-eye-slash", "To watch");
-    const btnUsers = makeBtn("fa-solid fa-users", "Letterboxd ID");
+    const btnSeen = makeBtn("fa-regular fa-eye", "Seen list");
+    const btnWatch = makeBtn("fa-regular fa-bookmark", "Watchlist");
+    const btnUsers = makeBtn("fa-solid fa-user-plus", "Should We Watch It?");
     const btnRandom = makeBtn("fa-solid fa-bolt", "Random pick");
     const btnSearch = makeBtn("fa-solid fa-magnifying-glass", "Search");
     const btnHelp = makeBtn("fa-solid fa-ellipsis-vertical", "Help and shortcuts");
@@ -334,6 +334,10 @@
     matchUserClose.innerHTML = "<i class=\"fa-solid fa-xmark\" aria-hidden=\"true\"></i>";
     matchUserWrap.append(matchUserName, matchUserClose);
     btnUsers.appendChild(matchUserWrap);
+    btnSeen.dataset.note = "seen films list";
+    btnWatch.dataset.note = "watchlist";
+    btnUsers.dataset.note = "should we watch it?";
+    btnRandom.dataset.note = "pick a random film";
     btnSeen.dataset.mode = "seen";
     btnWatch.dataset.mode = "watchlist";
     [btnSeen, btnWatch].forEach((btn) => btn.setAttribute("aria-pressed", "false"));
@@ -411,6 +415,7 @@
     const closeMenu = () => {
       if (!isOpen) return;
       isOpen = false;
+      container.classList.remove("show-help-notes");
       btnHelp.setAttribute("aria-expanded", "false");
       menu.style.display = "none";
       menu.classList.remove("is-open");
@@ -432,6 +437,7 @@
     const openMenu = () => {
       if (isOpen) return;
       isOpen = true;
+      container.classList.add("show-help-notes");
       // Reset inline inputs to avoid auto-focus/keyboard pop-up on mobile
       collapseInlineSearch();
       collapseInlineId();

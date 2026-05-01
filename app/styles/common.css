@@ -62,11 +62,15 @@ body {
   border-radius: 999px;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.25);
   --mode-index: 0;
-  --mode-gap: 6px;
+  --mode-gap: 0px;
   overflow: hidden;
   justify-items: center;
   width: var(--mode-size);
   gap: var(--mode-gap);
+}
+
+.menu.show-help-notes .mode-buttons {
+  overflow: visible;
 }
 
 .mode-buttons[hidden] {
@@ -100,6 +104,92 @@ body {
   cursor: pointer;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0);
   transition: background 120ms ease, transform 120ms ease, box-shadow 120ms ease;
+}
+
+.menu.show-help-notes .menu__btn[data-note] {
+  position: relative;
+  overflow: visible;
+}
+
+.menu.show-help-notes .menu__btn[data-note]::after {
+  content: attr(data-note);
+  position: absolute;
+  right: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--help-border);
+  background: rgba(18, 19, 22, 0.92);
+  color: var(--help-label);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  transform: translateY(-50%);
+  animation: help-note-reveal 1400ms ease forwards, help-note-float 4.8s ease-in-out infinite;
+}
+
+.menu.show-help-notes .menu__btn[data-note]::before {
+  content: "";
+  position: absolute;
+  right: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  border-width: 6px 6px 6px 0;
+  border-style: solid;
+  border-color: transparent rgba(18, 19, 22, 0.92) transparent transparent;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0;
+  transform: translateY(-50%);
+  animation: help-note-reveal 1200ms ease forwards, help-note-float 2.7s ease-in-out infinite;
+}
+
+.menu.show-help-notes .menu__btn[data-note="seen films list"]::after,
+.menu.show-help-notes .menu__btn[data-note="seen films list"]::before {
+  animation-delay: 0s;
+}
+
+
+.menu.show-help-notes .menu__btn[data-note="watchlist"]::after,
+.menu.show-help-notes .menu__btn[data-note="watchlist"]::before {
+  animation-delay: 1.2s;
+}
+
+
+.menu.show-help-notes .menu__btn[data-note="should we watch it?"]::after,
+.menu.show-help-notes .menu__btn[data-note="should we watch it?"]::before {
+  animation-delay: 2.4s;
+}
+
+
+.menu.show-help-notes .menu__btn[data-note="pick a random film"]::after,
+.menu.show-help-notes .menu__btn[data-note="pick a random film"]::before {
+  animation-delay: 3.6s;
+}
+
+
+@keyframes help-note-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes help-note-float {
+  0%,
+  100% {
+    transform: translateY(-50%);
+  }
+  50% {
+    transform: translateY(calc(-50% - 2px));
+  }
 }
 
 .menu__btn--search {
